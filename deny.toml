@@ -3,9 +3,8 @@
 
 [graph]
 # Doftar ships for macOS only; dependencies other platforms would pull in
-# (tauri's Windows/Linux HTTP client, for one) are not part of the binary.
+# (tauri's iOS/Android HTTP client, for one) are not part of the binary.
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
-all-features = false
 
 [advisories]
 version = 2
