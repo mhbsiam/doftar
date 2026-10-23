@@ -1976,6 +1976,19 @@ h2 + .lede {
   background: var(--accent-tint);
   color: var(--accent);
 }
+.dl-side {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+.dl-side p {
+  margin: 0;
+}
+.dl-star {
+  font-size: 15px;
+  color: var(--ink-2);
+  max-width: 48ch;
+}
 .dl-alt {
   margin: 0;
   font-size: 14px;

@@ -37,6 +37,10 @@ and 4, then open Doftar as usual.
 
 Updating is the same: download the new release and replace the app.
 
+**Like Doftar?** Please consider giving it a ⭐ on
+[GitHub](https://github.com/mhbsiam/doftar). It helps other people coming
+from Windows find it.
+
 ## Highlights
 
 - **Explorer layout**: tabs you can drag between windows, back/forward/up,
