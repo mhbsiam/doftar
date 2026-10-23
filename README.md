@@ -14,9 +14,9 @@ keyboard shortcuts you already know from Windows (Mac ones work too). Runs on
 Apple Silicon and Intel, makes no network connections, and needs nothing else
 installed.
 
-### 🌐 **[Visit the Doftar website](https://mhbsiam.github.io/doftar/)**
+### **[Doftar website](https://mhbsiam.github.io/doftar/)**
 
-See Doftar in action, take the tour of its features, and download the latest
+See Doftar in action, take a tour of its features, and download the latest
 build in one click at **[mhbsiam.github.io/doftar](https://mhbsiam.github.io/doftar/)**.
 
 ## Download
