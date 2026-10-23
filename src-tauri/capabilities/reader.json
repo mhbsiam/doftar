@@ -1,0 +1,32 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "reader",
+  "description": "Capabilities for the reader window (Markdown, text and code). Web and mail links go to the browser; file links go through open_path, which never runs a program from a document.",
+  "windows": ["reader"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title",
+    "core:window:allow-set-focus",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://*" }, { "url": "http://*" }, { "url": "mailto:*" }]
+    },
+    "allow-motion-scale",
+    "allow-is-text-file",
+    "allow-open-image-viewer",
+    "allow-open-link-target",
+    "allow-stat-entries",
+    "allow-path-exists",
+    "allow-read-document",
+    "allow-reader-ready",
+    "allow-runs-as-program",
+    "allow-show-zoomed"
+  ]
+}

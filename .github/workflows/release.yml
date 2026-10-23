@@ -1,0 +1,83 @@
+name: Release
+
+# Runs only from the Actions tab (Run workflow). Raise `version` in
+# src-tauri/tauri.conf.json first: the release is tagged v<version>.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # For the build provenance attestation attached to each release.
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    # Protect this environment in the repository settings (required
+    # reviewers) so a release needs a second pair of eyes.
+    environment: release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        # Lockfile versions only, and no package install scripts.
+        run: npm ci --ignore-scripts
+
+      - name: Check the Rust lockfile is current
+        run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Build and publish the release
+        id: build
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Doftar v__VERSION__
+          releaseBody: |
+            Download the .dmg below and replace the installed app.
+
+            SHA256SUMS lists the checksum of every file. Each file also carries a
+            build provenance attestation: `gh attestation verify <file> --repo ${{ github.repository }}`.
+          releaseDraft: false
+          prerelease: false
+          # One build for Apple Silicon and Intel.
+          args: --target universal-apple-darwin
+
+      - name: Write checksums
+        id: sums
+        run: |
+          cd src-tauri/target/universal-apple-darwin/release/bundle/dmg
+          shasum -a 256 *.dmg > SHA256SUMS
+          cat SHA256SUMS
+          echo "dir=$PWD" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-path: |
+            ${{ steps.sums.outputs.dir }}/*.dmg
+            ${{ steps.sums.outputs.dir }}/SHA256SUMS
+
+      - name: Attach checksums to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          gh release upload "v$version" "${{ steps.sums.outputs.dir }}/SHA256SUMS" --clobber

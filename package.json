@@ -1,0 +1,37 @@
+{
+  "name": "doftar",
+  "private": true,
+  "version": "0.1.0",
+  "description": "An Explorer-style file manager for macOS, made for Windows switchers",
+  "license": "Apache-2.0",
+  "author": "Hasanul Banna Siam",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "notices": "node scripts/gen-notices.mjs",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.60.0",
+    "@fluentui/react-icons": "^2.0.270",
+    "@tauri-apps/api": "^2.5.0",
+    "@tauri-apps/plugin-opener": "^2.2.6",
+    "lowlight": "^3.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.6.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}

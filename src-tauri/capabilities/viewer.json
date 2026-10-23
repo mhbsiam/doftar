@@ -1,0 +1,33 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "viewer",
+  "description": "Capabilities for the image viewer window",
+  "windows": ["viewer"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
+    "core:window:allow-outer-size",
+    "core:window:allow-set-title",
+    "core:window:allow-set-focus",
+    "drag:default",
+    "allow-motion-scale",
+    "allow-list-images",
+    "allow-open-with",
+    "allow-path-exists",
+    "allow-save-image-edit",
+    "allow-show-zoomed",
+    "allow-viewer-image",
+    "allow-viewer-ready",
+    "allow-viewer-set-dirty",
+    "allow-viewer-shown"
+  ]
+}

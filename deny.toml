@@ -1,0 +1,60 @@
+# cargo-deny: keeps the Rust side of Doftar offline and under permissive licenses.
+# Run locally with `cargo deny --manifest-path src-tauri/Cargo.toml check`.
+
+[graph]
+# Doftar ships for macOS only; dependencies other platforms would pull in
+# (tauri's Windows/Linux HTTP client, for one) are not part of the binary.
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+all-features = false
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "Zlib",
+  "Unicode-3.0",
+  "MPL-2.0",
+  "CC0-1.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+# Doftar makes no network connections. Any of these appearing in the macOS
+# dependency graph is a bug, whatever pulled it in.
+deny = [
+  { crate = "reqwest", reason = "Doftar is offline: no HTTP client" },
+  { crate = "hyper", reason = "Doftar is offline: no HTTP stack" },
+  { crate = "hyper-util", reason = "Doftar is offline" },
+  { crate = "h2", reason = "Doftar is offline" },
+  { crate = "ureq", reason = "Doftar is offline: no HTTP client" },
+  { crate = "curl", reason = "Doftar is offline: no HTTP client" },
+  { crate = "curl-sys", reason = "Doftar is offline" },
+  { crate = "isahc", reason = "Doftar is offline: no HTTP client" },
+  { crate = "attohttpc", reason = "Doftar is offline: no HTTP client" },
+  { crate = "minreq", reason = "Doftar is offline: no HTTP client" },
+  { crate = "surf", reason = "Doftar is offline: no HTTP client" },
+  { crate = "tungstenite", reason = "Doftar is offline: no WebSockets" },
+  { crate = "tokio-tungstenite", reason = "Doftar is offline: no WebSockets" },
+  { crate = "async-tungstenite", reason = "Doftar is offline: no WebSockets" },
+  { crate = "tauri-plugin-http", reason = "Doftar is offline: no HTTP from the webview" },
+  { crate = "tauri-plugin-updater", reason = "Doftar is offline: updates are manual downloads" },
+  { crate = "tauri-plugin-websocket", reason = "Doftar is offline" },
+  { crate = "tauri-plugin-shell", reason = "the webview must not run shell commands" },
+  { crate = "sentry", reason = "no crash reporting leaves the Mac" },
+  { crate = "rustls", reason = "nothing to encrypt in transit: Doftar is offline" },
+  { crate = "native-tls", reason = "nothing to encrypt in transit: Doftar is offline" },
+  { crate = "openssl", reason = "nothing to encrypt in transit: Doftar is offline" },
+  { crate = "openssl-sys", reason = "nothing to encrypt in transit: Doftar is offline" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

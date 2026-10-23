@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Doftar · An Explorer-style file manager for macOS</title>
+<meta name="description" content="Doftar is a free, open-source file manager for macOS with tabs, a breadcrumb address bar, split view, cut and paste that works with Finder, built-in viewers, and no network access at all. Made for people coming from Windows.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Doftar · An Explorer-style file manager for macOS">
+<meta property="og:description" content="Tabs, a breadcrumb address bar, split view, cut and paste that works with Finder, built-in viewers. Open source. No network access at all.">
+<meta property="og:image" content="https://mhbsiam.github.io/doftar/assets/og.png">
+<meta property="og:url" content="https://mhbsiam.github.io/doftar/">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#f1f3f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b2028" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Apply a saved theme before first paint. Same data-theme attribute as the app.
+  try {
+    var t = localStorage.getItem('doftar-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+  } catch (e) {}
+  document.documentElement.classList.remove('no-js');
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 20 20"><path d="M3 9.5 10 3.5l7 6V16a1 1 0 0 1-1 1h-3.5v-4.5h-5V17H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 20 20"><circle cx="10" cy="6.5" r="3"/><path d="M4 17c0-3 2.5-5 6-5s6 2 6 5z"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 20 20"><path d="M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 3v7h7"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 20 20"><path d="M3 10.5V4a1 1 0 0 1 1-1h6.5l6.5 6.5-7.5 7.5z"/><circle cx="7" cy="7" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 20 20"><path d="M4 6h12M8 6V4h4v2M5 6l1 11h8l1-11M8.5 9v5M11.5 9v5"/></symbol>
+  <symbol id="i-desktop" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="9" rx="1"/><path d="M10 13v3M6.5 16h7"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 20 20"><path d="M5 3h6l4 4v10H5z"/><path d="M11 3v4h4"/></symbol>
+  <symbol id="i-down" viewBox="0 0 20 20"><path d="M10 3v10M6 9l4 4 4-4M4 17h12"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 20 20"><path d="M3 5a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-hd" viewBox="0 0 20 20"><rect x="2.5" y="8" width="15" height="5" rx="1.5"/><circle cx="14.5" cy="10.5" r="0.8" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 20 20"><path d="M6 15a3.5 3.5 0 0 1-.5-7A4.5 4.5 0 0 1 14 7.5a3.5 3.5 0 0 1 .5 7z"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 20 20"><path d="M5 12l5-5 5 5"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav" id="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/doftar-icon.svg" alt="" width="28" height="28">Doftar</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#origins">Origins</a>
+      <a href="#lineage">Lineage</a>
+      <a href="#features">Features</a>
+      <a href="#keys">Shortcuts</a>
+      <a href="#download">Download</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="icon-btn" href="https://github.com/mhbsiam/doftar" aria-label="Doftar on GitHub" title="GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <button class="icon-btn" id="theme" type="button" aria-label="Switch to dark theme" title="Theme">
+        <svg class="sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>
+        <svg class="moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M13.5 9.6A6 6 0 0 1 6.4 2.5a6 6 0 1 0 7.1 7.1z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ============ HERO ============ -->
+<section class="hero" aria-labelledby="h1">
+  <div class="wrap">
+    <div>
+      <h1 id="h1">The file manager macOS <em>forgot to ship.</em></h1>
+      <p class="lede">Doftar gives your Mac an Explorer-style window: tabs, an address bar you can type into, a navigation pane, and cut and paste that actually moves. Underneath it is plain macOS, and it never opens a network connection.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="https://github.com/mhbsiam/doftar/releases/latest">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 12.5h11"/></svg>
+          Download for macOS
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/mhbsiam/doftar">View on GitHub</a>
+      </div>
+      <p class="hero-fine">Free and open source. macOS 13 or later, Apple silicon and Intel.</p>
+    </div>
+
+    <div class="hero-art" aria-hidden="true">
+      <div class="window">
+        <div class="w-tabs">
+          <div class="w-tab active"><i class="fold"></i>Home<span class="x">×</span></div>
+          <div class="w-tab plus">+</div>
+          <div class="w-ctl"><i>&#8212;</i><i>&#9633;</i><i>×</i></div>
+        </div>
+        <div class="w-addr">
+          <div class="w-nav"><i>‹</i><i>›</i><i>↑</i><i>↻</i></div>
+          <div class="w-crumbs"><span class="home">⌂</span><span>Home</span><span class="grow"></span><span class="sep">⌄</span><span class="sep">⋮</span></div>
+          <div class="w-search">⌕&nbsp; Open a folder to search</div>
+          <div class="w-gear">⚙</div>
+        </div>
+        <div class="w-cmd">
+          <span class="w-ic">▤</span>
+          <span class="w-new">+ New</span>
+          <span>Copy</span><span>Rename</span><span>Cut</span><span>Paste</span><span>Share</span><span>Delete</span>
+          <span class="grow"></span>
+          <span>Sort ↑</span><span>View ☰</span><span>Filter ≡</span><span class="w-ic">◫</span>
+        </div>
+        <div class="w-body">
+          <aside class="w-side">
+            <span class="on"><svg><use href="#i-home"/></svg>Home</span><span><svg><use href="#i-user"/></svg>User</span><span><svg><use href="#i-apps"/></svg>Apps</span><span><svg><use href="#i-disk"/></svg>Disk</span><span><svg><use href="#i-tag"/></svg>Tags</span><span><svg><use href="#i-trash"/></svg>Trash</span>
+            <b>Quick access<svg><use href="#i-chev"/></svg></b>
+            <span><svg><use href="#i-desktop"/></svg>Desktop</span><span><svg><use href="#i-doc"/></svg>Documents</span><span><svg><use href="#i-down"/></svg>Downloads</span>
+            <b>Favorites<svg><use href="#i-chev"/></svg></b>
+            <span><svg><use href="#i-folder"/></svg>GitHub</span>
+            <b>Drives<svg><use href="#i-chev"/></svg></b>
+            <span><svg><use href="#i-hd"/></svg>Macintosh HD</span>
+            <b>Cloud Drive<svg><use href="#i-chev"/></svg></b>
+            <span><svg><use href="#i-cloud"/></svg>iCloud Drive</span><span><svg><use href="#i-cloud"/></svg>Box</span><span><svg><use href="#i-cloud"/></svg>OneDrive</span>
+          </aside>
+          <div class="w-home">
+            <h4>⌄ Quick access</h4>
+            <div class="tiles">
+              <div class="tile"><i class="fi big c-desk"></i><div><b>Desktop</b><small>15 items · 13 MB</small></div></div>
+              <div class="tile"><i class="fi big c-grey"></i><div><b>Documents</b><small>750,169 items · 52.4 GB</small></div></div>
+              <div class="tile"><i class="fi big c-dl"></i><div><b>Downloads</b><small>686 items · 1.70 GB</small></div></div>
+            </div>
+            <h4>⌄ Drives</h4>
+            <div class="tiles">
+              <div class="tile drive"><i class="hd"></i><div><b>Macintosh HD</b><span class="bar"><span></span></span><small>35.6 GB free of 460.4 GB</small></div></div>
+            </div>
+            <h4>⌄ Favorites <a>Clear all</a></h4>
+            <div class="w-row"><div class="n"><i class="fi"></i><span>GitHub</span></div><span class="d">10/20/2026 1:04 PM</span><span class="d p">/Users/alex/Documents</span><span class="s">Pinned</span></div>
+            <h4>⌄ Recent <a>Clear all</a></h4>
+            <div class="w-row"><div class="n"><i class="fi doc"></i><span>Q3 budget.xlsx</span></div><span class="d">10/22/2026 9:14 PM</span><span class="d p">/Users/alex/Documents</span><span class="s">Opened</span></div>
+            <div class="w-row"><div class="n"><i class="fi img"></i><span>IMG_0412.heic</span></div><span class="d">10/22/2026 6:03 PM</span><span class="d p">/Users/alex/Pictures</span><span class="s">Opened</span></div>
+            <div class="w-row"><div class="n"><i class="fi doc"></i><span>Trip itinerary.pdf</span></div><span class="d">10/21/2026 11:20 AM</span><span class="d p">/Users/alex/Downloads</span><span class="s">Opened</span></div>
+            <div class="w-row"><div class="n"><i class="fi doc"></i><span>notes.md</span></div><span class="d">10/20/2026 8:45 AM</span><span class="d p">/Users/alex/Documents/Projects</span><span class="s">Opened</span></div>
+          </div>
+        </div>
+        <div class="w-status"><span></span><span>☰ &nbsp; ⁙</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ORIGINS ============ -->
+<section class="origins" id="origins" aria-label="Origins of the name">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="eyebrow">The name</p>
+      <div class="word">doftar<span class="bn" lang="bn">দপ্তর</span></div>
+      <div class="word-meta"><i>dof·tar</i><span>noun</span><span>from Bangla <em>doptor</em></span></div>
+    </div>
+    <div class="origins-text reveal">
+      <p>In Bangla, a <em>doptor</em> is an office: the room where the files live and are found again when someone asks. Nobody thinks of it as software.</p>
+      <p>Doftar borrows the word and softens the spelling. The job is the same: keep your files where you can see them, move them without ceremony, and otherwise stay out of the way.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRINCIPLES ============ -->
+<section class="principles" aria-labelledby="princ-h">
+  <div class="wrap">
+    <p class="eyebrow reveal">Three rules</p>
+    <h2 id="princ-h" class="reveal">Simple is a feature you have to build.</h2>
+    <ol>
+      <li class="reveal">
+        <span class="num">1</span>
+        <div>
+          <h3>One window does the work</h3>
+          <p>Tabs, split view and viewers for images, text and PDFs live in one window. You stop bouncing between Finder, Preview and a text editor just to look at a folder.</p>
+        </div>
+      </li>
+      <li class="reveal">
+        <span class="num">2</span>
+        <div>
+          <h3>Nothing leaves your Mac</h3>
+          <p>No account, no telemetry, no update check. A macOS sandbox blocks all network access at launch, so Doftar could not phone home if it wanted to.</p>
+        </div>
+      </li>
+      <li class="reveal">
+        <span class="num">3</span>
+        <div>
+          <h3>It respects the system</h3>
+          <p>Quick Look, Spotlight, the clipboard, the Trash and Finder's tags: Doftar uses the real ones. Switch back to Finder at any moment and nothing is out of place.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ LINEAGE ============ -->
+<section class="lineage" id="lineage" aria-labelledby="lineage-h">
+  <div class="wrap">
+    <p class="eyebrow reveal">Lineage</p>
+    <h2 id="lineage-h" class="reveal">Borrowed from every desktop.</h2>
+    <p class="lede reveal">Every operating system got a few things right about files. Doftar keeps those and lets the rest go.</p>
+    <div class="lanes reveal">
+      <div class="lane">
+        <header><h3>From Windows</h3><small>Explorer</small></header>
+        <ul>
+          <li><b>Cut moves.</b> <kbd>⌘X</kbd> then <kbd>⌘V</kbd> moves files, and it works with Finder in both directions.</li>
+          <li><b>The keys you know.</b> <kbd>F2</kbd> renames, <kbd>Delete</kbd> trashes, <kbd>Alt</kbd> and arrows navigate, <kbd>Ctrl</kbd> shortcuts work.</li>
+          <li><b>A command bar</b>, item check boxes, a Properties dialog and a Network section in the sidebar.</li>
+        </ul>
+      </div>
+      <div class="lane">
+        <header><h3>From Linux</h3><small>desktops</small></header>
+        <ul>
+          <li><b>Tabs that tear off.</b> Drag a tab out to make a window, or onto another window to move it there.</li>
+          <li><b>Open in Terminal</b> on any folder, with the terminal you already use.</li>
+          <li><b>Archives extract in place</b>, no unarchiver needed.</li>
+        </ul>
+      </div>
+      <div class="lane macos">
+        <header><h3>From macOS</h3><small>Kept, not replaced</small></header>
+        <ul>
+          <li><b>Quick Look.</b> Tap <kbd>Space</kbd> to preview a file, hold to peek.</li>
+          <li><b>Spotlight search</b> across every subfolder, with a plain folder search where Spotlight is off.</li>
+          <li><b>Share and AirDrop</b>, the system Trash, Finder tags, and iCloud, OneDrive and Box drives found on their own.</li>
+          <li><b>Finder-style drag and drop.</b> Same drive moves, another drive copies, Option (Alt) forces a copy.</li>
+          <li><b>Light and dark appearance</b>, and smooth on 120 Hz displays.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="menu-show reveal">
+      <div class="menu" aria-hidden="true">
+        <div class="m-row"><i>⧉</i><i>✎</i><i>✂</i><i>⇪</i><i>🗑</i></div>
+        <hr>
+        <div class="m-item"><i>▭</i>Open</div>
+        <div class="m-item"><i>▭</i>Open in new tab</div>
+        <div class="m-item"><i>♡</i>Add to Favorites</div>
+        <hr>
+        <div class="m-item"><i>▣</i>Compress to ZIP</div>
+        <div class="m-item"><i>⧉</i>Copy as path</div>
+        <div class="m-item"><i>ⓘ</i>Properties</div>
+        <hr>
+        <div class="m-tags"><i style="--c:#e8453c"></i><i style="--c:#f0a030"></i><i style="--c:#f5d33f"></i><i style="--c:#5cc85c"></i><i style="--c:#3b82f6"></i><i style="--c:#a855f7"></i><i style="--c:#8e8e93"></i></div>
+        <div class="m-item"><i>⌂</i>Tags<span class="chev">›</span></div>
+        <hr>
+        <div class="m-item"><i>▸_</i>Open in Terminal</div>
+      </div>
+      <div class="menu-text">
+        <h3>One menu, two traditions</h3>
+        <p>Right-click anything and the first row is Explorer's: copy, rename, cut, share and delete as icons. Below it the list reads like Finder's, tag colours included.</p>
+        <p>The same menu appears everywhere: files, folders, empty space, tabs and the sidebar.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FEATURES ============ -->
+<section class="features" id="features" aria-labelledby="feat-h">
+  <div class="wrap">
+    <p class="eyebrow reveal">What it adds</p>
+    <h2 id="feat-h" class="reveal">Things Finder makes you open another app for.</h2>
+    <div class="grid">
+
+      <article class="feat wide reveal">
+        <div class="treemap" aria-hidden="true">
+          <i>Library · 61 GB</i><i>Movies · 24 GB</i><i>Photos · 18 GB</i><i>Xcode · 11 GB</i><i>node_modules</i>
+        </div>
+        <div class="text">
+          <h3>Disk view</h3>
+          <p>A storage chart for each drive, its largest folders and files, and a zoomable map of the folder you are in. Find the forgotten 20 GB and delete it from the same window.</p>
+        </div>
+      </article>
+
+      <article class="feat wide cmd reveal">
+        <div class="addr-demo" aria-hidden="true">
+          <div class="w-tabs"><div class="w-tab active"><i class="fold"></i>Downloads<span class="x">×</span></div><div class="w-tab plus">+</div></div>
+          <div class="w-addr">
+            <div class="w-nav"><i>‹</i><i>›</i><i>↑</i><i>↻</i></div>
+            <div class="w-crumbs focus"><span class="typed"><span class="t1">git status</span><span class="t2">ls -la</span><span class="t3">npm test</span></span><span class="grow"></span><span class="sep">⌄</span><span class="sep">⋮</span></div>
+          </div>
+          <div class="w-cmd"><span class="w-ic">▤</span><span class="w-new">+ New</span><span>Copy</span><span>Rename</span><span>Cut</span><span>Paste</span><span>Share</span><span>Delete</span></div>
+          <div class="term"><span class="prompt">~/Downloads $</span> <span class="out1">git status</span><span class="out2">ls -la</span><span class="out3">npm test</span></div>
+        </div>
+        <div class="text">
+          <h3>The address bar runs commands</h3>
+          <p>The address bar takes paths, and it takes commands. Type <code>git status</code> and press Enter: your terminal opens in the folder you are looking at and runs it. No cd, no copying paths.</p>
+          <p>Works with Terminal, iTerm2, Warp, Ghostty and WezTerm.</p>
+        </div>
+      </article>
+
+      <article class="feat reveal">
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 12h24v20H8zM8 12l3-5h18l3 5M20 12v20M14 18h3M14 24h3M23 18h3M23 24h3"/></svg>
+        <h3>Every archive, built in</h3>
+        <p>Compress to ZIP, or extract ZIP, tar, 7z, RAR, ISO and a dozen more without installing an unarchiver.</p>
+      </article>
+
+      <article class="feat wide viewers reveal">
+        <div class="text">
+          <h3>Viewers, built in</h3>
+          <p>Images, Markdown, text, code and PDFs open in Doftar's own windows, drawn by the same engines Preview uses.</p>
+        </div>
+        <div class="vgrid" aria-hidden="true">
+          <div class="mini img">
+            <div class="mini-bar"><span>IMG_0412.heic</span><span class="tools">⟲ ⟳ ⇋ ⇵ ⌗ ⤢</span></div>
+            <div class="mini-body"><div class="photo"><div class="crop"><i></i><i></i><i></i><i></i></div></div></div>
+            <div class="mini-cap"><b>Image viewer and editor</b>Step through the folder, zoom, rotate, flip and crop, then save over the original or as a copy. Rotating a photo never re-encodes it.</div>
+          </div>
+          <div class="mini md">
+            <div class="mini-bar"><span>README.md</span><span class="tools">Open in …</span></div>
+            <div class="mini-body">
+              <div class="outline"><i></i><i class="in"></i><i class="in"></i><i></i><i class="in"></i></div>
+              <div class="doc"><b class="h"></b><i></i><i></i><i class="short"></i><b class="h2"></b><i></i><div class="code"><i></i><i class="short"></i><i></i></div><i></i><i class="short"></i></div>
+            </div>
+            <div class="mini-cap"><b>Markdown reader</b>Tables, coloured code, footnotes and an outline of the headings. Links to other Markdown files open in the reader. Nothing in the file can run script.</div>
+          </div>
+          <div class="mini txt">
+            <div class="mini-bar"><span>analysis.py</span><span class="tools">Python</span></div>
+            <div class="mini-body">
+              <div class="src"><span class="ln">1</span><i class="kw"></i><i></i><span class="ln">2</span><i class="kw"></i><i class="str"></i><span class="ln">3</span><span class="ln">4</span><i class="kw"></i><i></i><i class="str"></i><span class="ln">5</span><i class="ind"></i><i></i><span class="ln">6</span><i class="ind"></i><i class="kw"></i><i></i><span class="ln">7</span><span class="ln">8</span><i class="cm"></i></div>
+            </div>
+            <div class="mini-cap"><b>Text and code</b>Logs wrap like prose; code shows coloured with line numbers. Doftar checks the file really is text first, so a .ts video still opens in its player.</div>
+          </div>
+          <div class="mini pdf">
+            <div class="mini-bar"><span>supplement.pdf</span><span class="tools">3 / 14 &nbsp; ⌕ &nbsp; ◫</span></div>
+            <div class="mini-body">
+              <div class="thumbs"><i></i><i></i><i class="on"></i><i></i></div>
+              <div class="pages"><div class="page"><i></i><i></i><i></i><i class="short"></i><i></i><i></i></div><div class="page"><i></i><i class="short"></i><i></i><i></i><i></i></div></div>
+            </div>
+            <div class="mini-cap"><b>PDF viewer</b>The same engine as Preview: thumbnails, two-page spreads, find, and password-protected files. Links open only web and mail addresses, never files or apps.</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="feat wide split reveal">
+        <div class="split-demo" aria-hidden="true">
+          <div class="pane">
+            <div class="p-side"><i class="on"></i><i></i><i></i><i></i><b></b><i></i><i></i></div>
+            <div class="p-main">
+              <div class="p-crumb">Home › Documents › Research</div>
+              <div class="p-row"><em class="fi"></em><span>Datasets</span></div>
+              <div class="p-row sel"><em class="fi"></em><span>Figures</span></div>
+              <div class="p-row"><em class="fi c-rose"></em><span>Manuscripts</span></div>
+              <div class="p-row"><em class="fi doc"></em><span>notes.md</span></div>
+              <div class="p-row"><em class="fi doc"></em><span>analysis.py</span></div>
+            </div>
+          </div>
+          <div class="pane mirror">
+            <div class="p-main">
+              <div class="p-crumb">Field drive › 2026-10 › raw</div>
+              <div class="p-row"><em class="fi c-sun"></em><span>day-01</span></div>
+              <div class="p-row"><em class="fi c-sun"></em><span>day-02</span></div>
+              <div class="p-row drop"><em class="fi c-sun"></em><span>day-03</span></div>
+              <div class="p-row"><em class="fi doc"></em><span>calibration.csv</span></div>
+              <div class="p-row"><em class="fi doc"></em><span>log.txt</span></div>
+            </div>
+            <div class="p-side"><i></i><i></i><i class="on"></i><i></i><b></b><i></i><i></i></div>
+          </div>
+          <div class="drag"><em class="fi"></em></div>
+        </div>
+        <div class="text">
+          <h3>Split view</h3>
+          <p>Press <kbd>⌘\</kbd> and the window becomes two explorers side by side, sidebars on the outer edges, so the two file lists meet in the middle.</p>
+          <p>Each half has its own tabs and history. Drop a file across the divide to move it, or hold Option to copy.</p>
+        </div>
+      </article>
+
+      <article class="feat reveal">
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M8 10h24v22H8zM8 10l3-4h8l3 4"/><path d="M14 22a6 6 0 0 1 12 0"/><circle cx="20" cy="22" r="1.4" fill="currentColor"/></svg>
+        <h3>Live folder sizes</h3>
+        <p>Properties counts a folder's real size while you watch. Sizes and dates in the list update when another app writes a file.</p>
+      </article>
+
+      <article class="feat reveal">
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="8" width="22" height="24" rx="3"/><path d="M15 14h10M15 19h10M15 24h6"/><path d="M27 29l3 3 6-7" stroke-linecap="round"/></svg>
+        <h3>Uninstall an app properly</h3>
+        <p>Remove an app together with what it left behind: caches, preferences and startup items, each listed with its size before you confirm.</p>
+      </article>
+
+      <article class="feat reveal">
+        <svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 12h10l3 3h15v17H6z"/><path d="M6 12V9h8l2 3" /><circle cx="29" cy="25" r="3" fill="currentColor" stroke="none"/></svg>
+        <h3>Colours and tags</h3>
+        <p>Give each folder one of eight colours and it carries through tabs, the address bar and the sidebar. Finder tags get their own view, so a tag works like a folder.</p>
+      </article>
+
+      <article class="feat duo reveal">
+        <div>
+          <span class="num">50</span>
+          <div>
+            <h3>Undo, fifty times</h3>
+            <p>Rename, move, copy and Trash can all be undone and redone. Trashing never asks first; undo it instead. Copies show progress and can be cancelled.</p>
+          </div>
+        </div>
+        <div>
+          <span class="num">0</span>
+          <div>
+            <h3>Prompts to control Finder</h3>
+            <p>Restore from the Trash, empty it and eject drives from Doftar, without a prompt asking to control Finder.</p>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ MOTION ============ -->
+<section class="motion" aria-labelledby="motion-h">
+  <div class="wrap">
+    <p class="eyebrow reveal">Motion</p>
+    <h2 id="motion-h" class="reveal">You can see where things go.</h2>
+    <p class="lede reveal">Doftar animates facts: where a file came from, where it went, which folder is about to open. All of it stops when Reduce Motion is on in System Settings.</p>
+    <div class="demos">
+      <div class="demo fly reveal">
+        <div class="stage" aria-hidden="true">
+          <div class="row"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+          <div class="viewer"></div>
+          <div class="thumb"></div>
+        </div>
+        <h3>Files fly</h3>
+        <p>Open an image and its thumbnail grows into the viewer window, then flies back when you close it. Moved and trashed items fly too.</p>
+      </div>
+      <div class="demo morph reveal">
+        <div class="stage" aria-hidden="true">
+          <div class="field">
+            <div class="lines"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="item a"></div><div class="item b"></div><div class="item c"></div>
+            <div class="item d"></div><div class="item e"></div><div class="item f"></div>
+          </div>
+        </div>
+        <h3>Views morph</h3>
+        <p>Switch between Details and Icons and each file's icon travels from its row to its tile. You never lose your place in the folder.</p>
+      </div>
+      <div class="demo spring reveal">
+        <div class="stage" aria-hidden="true">
+          <div class="folder">
+            <svg class="ring" viewBox="0 0 96 82" preserveAspectRatio="none"><rect x="1.5" y="1.5" width="93" height="79" rx="14" pathLength="1"/></svg>
+          </div>
+          <div class="ghost"></div>
+          <div class="open"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <h3>Folders spring open</h3>
+        <p>Rest a drag on a folder or a tab and a ring sweeps around it before it opens, so you know what is about to happen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SHORTCUTS ============ -->
+<section class="keys" id="keys" aria-labelledby="keys-h">
+  <div class="wrap">
+    <p class="eyebrow reveal">Keyboard</p>
+    <h2 id="keys-h" class="reveal">Mac keys first. Your Windows muscle memory also works.</h2>
+    <div class="scroll reveal">
+    <table>
+      <thead><tr><th>Action</th><th>Mac</th><th>Windows-style</th></tr></thead>
+      <tbody>
+        <tr><td>Copy, cut, paste</td><td><kbd>⌘C</kbd> <kbd>⌘X</kbd> <kbd>⌘V</kbd></td><td class="win"><kbd>Ctrl</kbd>+<kbd>C</kbd> <kbd>X</kbd> <kbd>V</kbd></td></tr>
+        <tr><td>Move item here</td><td><kbd>⌘⌥V</kbd></td><td class="win"></td></tr>
+        <tr><td>Undo, redo</td><td><kbd>⌘Z</kbd> <kbd>⇧⌘Z</kbd></td><td class="win"><kbd>Ctrl</kbd>+<kbd>Z</kbd></td></tr>
+        <tr><td>Quick Look (tap to toggle, hold to peek)</td><td><kbd>Space</kbd></td><td class="win"></td></tr>
+        <tr><td>Move to Trash</td><td><kbd>⌘⌫</kbd></td><td class="win"><kbd>Delete</kbd></td></tr>
+        <tr><td>Delete immediately</td><td><kbd>⌘⌥⌫</kbd></td><td class="win"><kbd>Shift</kbd>+<kbd>Delete</kbd></td></tr>
+        <tr><td>New folder, new text document</td><td><kbd>⌘⇧N</kbd> <kbd>⌘⇧T</kbd></td><td class="win"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td></tr>
+        <tr><td>New tab, close tab</td><td><kbd>⌘T</kbd> <kbd>⌘W</kbd></td><td class="win"><kbd>Ctrl</kbd>+<kbd>T</kbd> <kbd>W</kbd></td></tr>
+        <tr><td>Split view</td><td><kbd>⌘\</kbd></td><td class="win"></td></tr>
+        <tr><td>Open selection</td><td><kbd>⌘↓</kbd></td><td class="win"><kbd>Enter</kbd></td></tr>
+        <tr><td>Properties</td><td><kbd>⌘I</kbd></td><td class="win"></td></tr>
+        <tr><td>Rename</td><td><kbd>F2</kbd></td><td class="win"><kbd>F2</kbd></td></tr>
+        <tr><td>Open in Terminal</td><td><kbd>⌥⌘T</kbd></td><td class="win"></td></tr>
+        <tr><td>Back, forward</td><td><kbd>⌘[</kbd> <kbd>⌘]</kbd></td><td class="win"><kbd>Alt</kbd>+<kbd>←</kbd> <kbd>→</kbd></td></tr>
+        <tr><td>Up one folder</td><td><kbd>⌘↑</kbd></td><td class="win"><kbd>Alt</kbd>+<kbd>↑</kbd></td></tr>
+        <tr><td>Go to path</td><td><kbd>⌘⇧G</kbd></td><td class="win"></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DOWNLOAD ============ -->
+<section class="download" id="download" aria-labelledby="dl-h">
+  <div class="wrap">
+    <div class="intro">
+      <p class="eyebrow reveal">Get it</p>
+      <h2 id="dl-h" class="reveal">One disk image. Nothing else to install.</h2>
+    </div>
+    <div class="dl-card reveal">
+      <a class="btn btn-primary" href="https://github.com/mhbsiam/doftar/releases/latest">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 12.5h11"/></svg>
+        Download the latest DMG
+      </a>
+      <dl class="spec">
+        <dt>Requires</dt><dd>macOS 13 Ventura or later</dd>
+        <dt>Build</dt><dd>Universal, Apple silicon and Intel</dd>
+        <dt>Verify</dt><dd>Checksums and a signed build attestation on every release</dd>
+        <dt>License</dt><dd>Apache 2.0</dd>
+      </dl>
+      <ol class="steps">
+        <li><span>Open the DMG and drag Doftar to Applications.</span></li>
+        <li><span>Not yet notarized: the first time, right-click Doftar in Applications and choose <strong>Open</strong>.</span></li>
+        <li><span>macOS will ask for folder access the first time you open Desktop, Documents or Downloads. Doftar asks for nothing else.</span></li>
+      </ol>
+    </div>
+    <p class="muted reveal" style="font-size:14px;max-width:48ch">Built with Tauri and React. Releases are built in public on GitHub Actions, and every build is checked for dependencies that could touch the network.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="assets/doftar-icon.svg" alt="" width="28" height="28">Doftar</a>
+    <nav aria-label="Project links">
+      <a href="https://github.com/mhbsiam/doftar">GitHub</a>
+      <a href="https://github.com/mhbsiam/doftar/releases">Releases</a>
+      <a href="https://github.com/mhbsiam/doftar/issues">Issues</a>
+      <a href="https://github.com/mhbsiam/doftar/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/mhbsiam/doftar/blob/main/LICENSE">License</a>
+    </nav>
+    <p>Doftar is an independent open-source project by Hasanul Banna Siam, released under the Apache License 2.0, and is not affiliated with Apple or Microsoft. macOS, Finder and Quick Look are trademarks of Apple Inc.; Windows and File Explorer are trademarks of Microsoft Corporation.</p>
+  </div>
+</footer>
+
+<script src="script.js" defer></script>
+</body>
+</html>

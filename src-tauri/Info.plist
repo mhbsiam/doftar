@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>Doftar lists and manages the files on your Desktop.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>Doftar lists and manages the files in your Documents folder.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>Doftar lists and manages the files in your Downloads folder.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>Doftar lists and manages the files on external drives.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>Doftar lists and manages the files on network shares.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Doftar asks Finder to put back items that were moved to the Trash outside Doftar.</string>
+</dict>
+</plist>
