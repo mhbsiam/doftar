@@ -1978,16 +1978,46 @@ h2 + .lede {
 }
 .dl-side {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+.side-card {
+  display: grid;
+  gap: 10px;
   justify-items: start;
-}
-.dl-side p {
-  margin: 0;
-}
-.dl-star {
+  padding: 24px 28px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
   font-size: 15px;
   color: var(--ink-2);
-  max-width: 48ch;
+}
+.side-card p {
+  margin: 0;
+}
+.side-release {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 20px;
+}
+.side-release > div {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+.side-release .eyebrow {
+  margin: 0 0 4px;
+}
+.side-release h3 {
+  font-size: 20px;
+}
+.side-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 4px;
 }
 .dl-alt {
   margin: 0;

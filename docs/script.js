@@ -1,8 +1,9 @@
 // Doftar site. Small jobs: theme toggle, reveal-on-scroll, demos, download links.
 (function () {
-  // Download buttons point straight at the newest DMG. The DMG name carries
-  // the version, so ask GitHub for the latest release; if that fails the
-  // buttons keep their fallback href, the latest release page.
+  // Download buttons point straight at the newest DMG, and the release card
+  // shows its version and date. The DMG name carries the version, so ask
+  // GitHub for the latest release; if that fails the buttons keep their
+  // fallback href, the latest release page.
   var dl = document.querySelectorAll('[data-latest-dmg]');
   if (dl.length && window.fetch) {
     fetch('https://api.github.com/repos/mhbsiam/doftar/releases/latest', {
@@ -10,7 +11,17 @@
     })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (rel) {
-        var dmg = rel && (rel.assets || []).filter(function (a) {
+        if (!rel) return;
+        var ver = document.querySelector('[data-latest-version]');
+        var date = document.querySelector('[data-latest-date]');
+        var notes = document.querySelector('[data-latest-notes]');
+        if (ver && rel.tag_name) ver.textContent = 'Doftar ' + rel.tag_name;
+        if (date && rel.published_at) {
+          date.textContent = 'Released ' + new Date(rel.published_at).toLocaleDateString(
+            undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        if (notes && rel.html_url) notes.href = rel.html_url;
+        var dmg = (rel.assets || []).filter(function (a) {
           return /\.dmg$/i.test(a.name);
         })[0];
         if (!dmg) return;
