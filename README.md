@@ -7,7 +7,6 @@ coming from Windows.**
 
 [![Download](https://img.shields.io/github/v/release/mhbsiam/doftar?label=download&color=30736d)](https://github.com/mhbsiam/doftar/releases/latest)
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-lightgrey)
-![status](https://img.shields.io/badge/status-alpha-orange)
 [![website](https://img.shields.io/badge/website-mhbsiam.github.io%2Fdoftar-30736d)](https://mhbsiam.github.io/doftar/)
 
 Tabs, a command bar, a breadcrumb address bar and a navigation pane, with the
@@ -17,7 +16,7 @@ installed.
 
 ## Download
 
-1. Get the latest `Doftar_<version>_universal.dmg` from
+1. Get the latest `Doftar_<version>_macos.dmg` from
    **[Releases](https://github.com/mhbsiam/doftar/releases/latest)**.
 2. Open the DMG and drag **Doftar** into **Applications**.
 3. The app isn't notarized yet, so the first launch needs one extra step:
