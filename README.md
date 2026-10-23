@@ -26,9 +26,14 @@ build in one click at **[mhbsiam.github.io/doftar](https://mhbsiam.github.io/dof
    `Doftar_<version>_macos.dmg` from
    [Releases](https://github.com/mhbsiam/doftar/releases/latest).
 2. Open the DMG and drag **Doftar** into **Applications**.
-3. The app isn't notarized yet, so the first launch needs one extra step:
-   right-click Doftar in Applications and choose **Open**, or run
-   `xattr -cr /Applications/Doftar.app`.
+3. Open Doftar. The app isn't notarized yet, so macOS says it can't verify
+   it. Click **Done**, not Move to Trash.
+4. Open **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** next to the message about Doftar. Click **Open** and enter
+   your password. You only do this once.
+
+Prefer Terminal? Run `xattr -cr /Applications/Doftar.app` instead of steps 3
+and 4, then open Doftar as usual.
 
 Updating is the same: download the new release and replace the app.
 

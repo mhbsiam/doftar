@@ -1976,6 +1976,15 @@ h2 + .lede {
   background: var(--accent-tint);
   color: var(--accent);
 }
+.dl-alt {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.dl-alt code {
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
 @media (min-width: 880px) {
   .download .wrap {
     grid-template-columns: 1fr 1fr;

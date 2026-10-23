@@ -490,9 +490,11 @@
       </dl>
       <ol class="steps">
         <li><span>Open the DMG and drag Doftar to Applications.</span></li>
-        <li><span>Not yet notarized: the first time, right-click Doftar in Applications and choose <strong>Open</strong>.</span></li>
+        <li><span>Open Doftar. It isn't notarized yet, so macOS says it can't verify it. Click <strong>Done</strong>, not Move to Trash.</span></li>
+        <li><span>In <strong>System Settings → Privacy &amp; Security</strong>, scroll down and click <strong>Open Anyway</strong>, then <strong>Open</strong>. You only do this once.</span></li>
         <li><span>macOS will ask for folder access the first time you open Desktop, Documents or Downloads. Doftar asks for nothing else.</span></li>
       </ol>
+      <p class="dl-alt">Prefer Terminal? Run <code>xattr -cr /Applications/Doftar.app</code> instead of steps 2 and 3.</p>
     </div>
     <p class="muted reveal" style="font-size:14px;max-width:48ch">Built with Tauri and React. Releases are built in public on GitHub Actions, and every build is checked for dependencies that could touch the network.</p>
     </div>

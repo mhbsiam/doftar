@@ -148,8 +148,8 @@ Rebuild notes:
 
 - Builds are incremental; only the first one takes a few minutes.
 - Ad-hoc signing has no Developer ID, so Gatekeeper still warns on other
-  Macs. Right-click and choose Open to bypass, or run `xattr -cr` on the
-  installed app. Removing the warning requires signing + notarization with an
+  Macs. Click **Open Anyway** in System Settings → Privacy & Security to
+  bypass, or run `xattr -cr` on the installed app. Removing the warning requires signing + notarization with an
   Apple Developer ID.
 - Each rebuild changes the app's code identity, so macOS forgets its Files and
   Folders grants; re-allow Doftar in Privacy & Security after installing.

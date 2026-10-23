@@ -62,7 +62,7 @@ for USB, network and other mounted volumes altogether.
   build provenance attestation you can verify with
   `gh attestation verify <file> --repo <owner>/doftar`.
 - Releases are not code-signed, so Gatekeeper asks you to confirm the first
-  launch (right-click → Open). Check the DMG against `SHA256SUMS` and its
+  launch (System Settings → Privacy & Security → Open Anyway). Check the DMG against `SHA256SUMS` and its
   attestation before doing so.
 - The only third-party Tauri plugins are `tauri-plugin-opener` (maintained by
   the Tauri team) and `tauri-plugin-drag` (a small plugin by a Tauri
