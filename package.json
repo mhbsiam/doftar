@@ -12,6 +12,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "tauri": "tauri",
+    "dmg": "bash scripts/build-dmg.sh",
     "notices": "node scripts/gen-notices.mjs",
     "icons": "node scripts/gen-icons.mjs"
   },

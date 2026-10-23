@@ -121,28 +121,39 @@ npm run tauri dev
 
 First Rust build takes a few minutes; subsequent ones are incremental.
 
-Production bundle:
+Release DMG (universal, ad-hoc signed; the same on every Mac):
 
 ```sh
-npm run tauri build
+npm run dmg               # build only
+npm run dmg -- --install  # build, then replace /Applications/Doftar.app
 ```
 
-Outputs:
+Outputs, in `src-tauri/target/universal-apple-darwin/release/bundle/`:
 
-- `src-tauri/target/release/bundle/dmg/Doftar_<version>_aarch64.dmg`: installable DMG
-- `src-tauri/target/release/bundle/macos/Doftar.app`
+- `dmg/Doftar_<version>_universal.dmg`: installable DMG
+- `dmg/SHA256SUMS`: its checksum
+- `macos/Doftar.app`
+
+What keeps builds consistent across machines:
+
+- `rust-toolchain.toml` pins the Rust version and both macOS targets; rustup
+  installs them on first use.
+- `bundle.macOS.signingIdentity` is `"-"` in `src-tauri/tauri.conf.json`, so
+  every build (local and CI) is ad-hoc signed with the hardened runtime.
+- `scripts/build-dmg.sh` puts Apple's `codesign` first on `PATH` (Anaconda
+  ships one that breaks signing), detaches scratch images left mounted by a
+  failed run, and checks the signature, architectures and DMG afterwards.
 
 Rebuild notes:
 
 - Builds are incremental; only the first one takes a few minutes.
-- The bundle is **unsigned**, so Gatekeeper warns when opening it on machines
-  other than the build machine. Right-click and choose Open to bypass, or run `xattr -cr`
-  on the installed app. Distributing beyond that requires signing +
-  notarization with an Apple Developer ID.
-- The DMG targets the build machine's architecture (`aarch64` on Apple
-  Silicon). For an Intel/universal build:
-  `rustup target add x86_64-apple-darwin aarch64-apple-darwin` then
-  `npm run tauri build -- --target universal-apple-darwin`.
+- Ad-hoc signing has no Developer ID, so Gatekeeper still warns on other
+  Macs. Right-click and choose Open to bypass, or run `xattr -cr` on the
+  installed app. Removing the warning requires signing + notarization with an
+  Apple Developer ID.
+- Each rebuild changes the app's code identity, so macOS forgets its Files and
+  Folders grants; re-allow Doftar in Privacy & Security after installing.
+- `npm run tauri dev` is unchanged for day-to-day work.
 
 ## Releasing
 

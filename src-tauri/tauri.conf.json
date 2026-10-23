@@ -74,7 +74,9 @@
     "active": true,
     "targets": "all",
     "macOS": {
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-",
+      "hardenedRuntime": true
     },
     "copyright": "Copyright (c) 2026 Hasanul Banna Siam. Licensed under the Apache License 2.0.",
     "shortDescription": "An Explorer-style file manager for macOS",
