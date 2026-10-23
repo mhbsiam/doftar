@@ -1,5 +1,27 @@
-// Doftar site. Three small jobs: theme toggle, reveal-on-scroll, copy button.
+// Doftar site. Small jobs: theme toggle, reveal-on-scroll, demos, download links.
 (function () {
+  // Download buttons point straight at the newest DMG. The DMG name carries
+  // the version, so ask GitHub for the latest release; if that fails the
+  // buttons keep their fallback href, the latest release page.
+  var dl = document.querySelectorAll('[data-latest-dmg]');
+  if (dl.length && window.fetch) {
+    fetch('https://api.github.com/repos/mhbsiam/doftar/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (rel) {
+        var dmg = rel && (rel.assets || []).filter(function (a) {
+          return /\.dmg$/i.test(a.name);
+        })[0];
+        if (!dmg) return;
+        dl.forEach(function (a) {
+          a.href = dmg.browser_download_url;
+          a.title = dmg.name;
+        });
+      })
+      .catch(function () {});
+  }
+
   var root = document.documentElement;
   var KEY = 'doftar-theme';
 

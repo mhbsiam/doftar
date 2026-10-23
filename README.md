@@ -14,10 +14,17 @@ keyboard shortcuts you already know from Windows (Mac ones work too). Runs on
 Apple Silicon and Intel, makes no network connections, and needs nothing else
 installed.
 
+### 🌐 **[Visit the Doftar website](https://mhbsiam.github.io/doftar/)**
+
+See Doftar in action, take the tour of its features, and download the latest
+build in one click at **[mhbsiam.github.io/doftar](https://mhbsiam.github.io/doftar/)**.
+
 ## Download
 
-1. Get the latest `Doftar_<version>_macos.dmg` from
-   **[Releases](https://github.com/mhbsiam/doftar/releases/latest)**.
+1. Download the latest DMG from the
+   **[Doftar website](https://mhbsiam.github.io/doftar/#download)**, or get
+   `Doftar_<version>_macos.dmg` from
+   [Releases](https://github.com/mhbsiam/doftar/releases/latest).
 2. Open the DMG and drag **Doftar** into **Applications**.
 3. The app isn't notarized yet, so the first launch needs one extra step:
    right-click Doftar in Applications and choose **Open**, or run
