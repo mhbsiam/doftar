@@ -1,0 +1,68 @@
+[package]
+name = "doftar"
+version = "1.0.0"
+description = "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks."
+authors = ["Hasanul Banna Siam"]
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+# Capitalized, so the process name reads "Doftar" in `tauri dev` too. Bundles use `mainBinaryName`.
+[[bin]]
+name = "Doftar"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset", "macos-private-api"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+trash = "5"
+libc = "0.2"
+fs2 = "0.4"
+dirs = "5"
+plist = "1"
+tauri-plugin-drag = "2.1.1"
+pulldown-cmark = { version = "0.13.6", default-features = false }
+# Local reads only. Without default features libgit2 has no HTTPS or SSH transport.
+git2 = { version = "0.21", default-features = false }
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+csv = "1"
+parquet = { version = "60", default-features = false, features = ["snap", "zstd", "lz4", "flate2-zlib-rs", "brotli"] }
+arrow-ipc = { version = "60", default-features = false, features = ["lz4", "zstd"] }
+arrow-cast = { version = "60", default-features = false }
+arrow-array = { version = "60", default-features = false }
+arrow-schema = { version = "60", default-features = false }
+hdf5-metno = { version = "0.15", features = ["static", "zlib"] }
+rusqlite = { version = "0.41", features = ["bundled", "hooks"] }
+calamine = "0.38"
+quick-xml = "0.42"
+zip = { version = "9", default-features = false, features = ["deflate"] }
+indexmap = { version = "2", features = ["serde"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSMenu", "NSMenuItem", "NSWindow", "NSButton", "NSPasteboard", "NSPasteboardItem", "NSWorkspace", "NSSharingService", "NSView", "NSResponder", "NSScreen", "NSAnimation", "NSAnimationContext", "NSAccessibility", "NSColor", "NSColorSpace", "NSGraphics", "NSImage", "objc2-quartz-core"] }
+objc2-quartz-core = { version = "0.3", features = ["CAMediaTimingFunction", "CALayer", "CATransaction"] }
+objc2-web-kit = { version = "0.3", features = ["WKWebViewConfiguration", "WKPreferences"] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSURL", "NSFileManager", "NSError", "NSGeometry", "NSData", "NSNotification", "NSOperation", "NSObject", "NSDictionary", "NSNull", "NSProgress", "block2"] }
+objc2-pdf-kit = { version = "0.3", features = ["PDFView", "PDFDocument", "PDFPage", "PDFSelection", "PDFThumbnailView", "PDFAction", "PDFActionRemoteGoTo"] }
+block2 = "0.6"
+objc2-quick-look-ui = { version = "0.3", features = ["QLPreviewPanel", "QLPreviewItem"] }
+objc2-core-foundation = { version = "0.3", features = ["CFString", "CFURL", "CFDictionary", "CFNumber", "CFArray", "CFCGTypes", "CFPropertyList", "CFData", "CFError"] }
+objc2-core-graphics = { version = "0.3", features = ["CGImage", "CGContext", "CGBitmapContext", "CGColorSpace"] }
+objc2-image-io = { version = "0.3", default-features = false, features = ["std", "CGImageSource", "CGImageDestination", "CGImageProperties", "objc2-core-graphics"] }
+objc2-quick-look-thumbnailing = { version = "0.3", default-features = false, features = ["std", "QLThumbnailGenerator", "QLThumbnailGenerationRequest", "QLThumbnailRepresentation", "block2", "objc2-core-foundation", "objc2-core-graphics"] }
+
+[profile.dev]
+incremental = true
+
+# Style lints that would only move complexity around here.
+[lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"

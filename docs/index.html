@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Doftar · A free, offline file manager for macOS</title>
+<meta name="description" content="A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.">
+<link rel="canonical" href="https://mhbsiam.github.io/doftar/">
+<link rel="icon" type="image/svg+xml" href="assets/doftar-icon.svg">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/favicon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Doftar">
+<meta property="og:title" content="Doftar · A free, offline file manager for macOS">
+<meta property="og:description" content="A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.">
+<meta property="og:url" content="https://mhbsiam.github.io/doftar/">
+<meta property="og:image" content="https://mhbsiam.github.io/doftar/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Doftar icon beside the words: The Mac file manager that opens your data.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Doftar · A free, offline file manager for macOS">
+<meta name="twitter:description" content="A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.">
+<meta name="twitter:image" content="https://mhbsiam.github.io/doftar/assets/og.png">
+<meta name="twitter:image:alt" content="The Doftar icon beside the words: The Mac file manager that opens your data.">
+<meta name="theme-color" content="#ffffff">
+<link rel="stylesheet" href="style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Doftar",
+  "description": "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.",
+  "operatingSystem": "macOS 27 or later",
+  "applicationCategory": "UtilitiesApplication",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://www.apache.org/licenses/LICENSE-2.0",
+  "url": "https://mhbsiam.github.io/doftar/",
+  "downloadUrl": "https://github.com/mhbsiam/doftar/releases/latest"
+}
+</script>
+</head>
+<body>
+
+<!-- Stroke icons take currentColor. .f is the filled folder. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="back" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></symbol>
+  <symbol id="fwd" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></symbol>
+  <symbol id="up" viewBox="0 0 16 16"><path d="M8 13V3M4 7l4-4 4 4"/></symbol>
+  <symbol id="refresh" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M12.5 1.8v3h-3"/></symbol>
+  <symbol id="home" viewBox="0 0 16 16"><path d="M2.5 7.5 8 3l5.5 4.5V13H10V9.5H6V13H2.5z"/></symbol>
+  <symbol id="user" viewBox="0 0 16 16"><circle cx="8" cy="5.5" r="2.5"/><path d="M3 13.5c.8-2.4 2.7-3.5 5-3.5s4.2 1.1 5 3.5"/></symbol>
+  <symbol id="apps" viewBox="0 0 16 16"><path d="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z"/></symbol>
+  <symbol id="disk" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.5"/></symbol>
+  <symbol id="tag" viewBox="0 0 16 16"><path d="M2.5 2.5h5l6 6-5 5-6-6z"/><circle cx="5.5" cy="5.5" r=".8"/></symbol>
+  <symbol id="git" viewBox="0 0 16 16"><circle cx="5" cy="3.5" r="1.5"/><circle cx="5" cy="12.5" r="1.5"/><circle cx="11" cy="6" r="1.5"/><path d="M5 5v6M11 7.5c0 2-3 2.5-6 3.5"/></symbol>
+  <symbol id="trash" viewBox="0 0 16 16"><path d="M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.7 9h5.6l.7-9"/></symbol>
+  <symbol id="search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4"/><path d="m10 10 3.5 3.5"/></symbol>
+  <symbol id="gear" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6 5 5M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/></symbol>
+  <symbol id="plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+  <symbol id="copy" viewBox="0 0 16 16"><path d="M5.5 5.5h7v8h-7zM3.5 10.5v-8h7"/></symbol>
+  <symbol id="rename" viewBox="0 0 16 16"><path d="m3 13 .6-2.6 7.2-7.2 2 2-7.2 7.2z"/></symbol>
+  <symbol id="cut" viewBox="0 0 16 16"><circle cx="4.5" cy="12" r="1.8"/><circle cx="11.5" cy="12" r="1.8"/><path d="M5.8 10.6 11 3M10.2 10.6 5 3"/></symbol>
+  <symbol id="paste" viewBox="0 0 16 16"><path d="M4.5 3.5h7v10h-7zM6.5 2.5h3v2h-3z"/></symbol>
+  <symbol id="share" viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5l3-3 3 3M3.5 8.5v5h9v-5"/></symbol>
+  <symbol id="compare" viewBox="0 0 16 16"><path d="M2.5 3.5H7v9H2.5zM9 3.5h4.5v9H9z"/></symbol>
+  <symbol id="split" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11zM8 3v10"/></symbol>
+  <symbol id="sidebar" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11zM6 3v10"/></symbol>
+  <symbol id="sort" viewBox="0 0 16 16"><path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"/></symbol>
+  <symbol id="list" viewBox="0 0 16 16"><path d="M6 4h7.5M6 8h7.5M6 12h7.5M2.5 4h1M2.5 8h1M2.5 12h1"/></symbol>
+  <symbol id="filter" viewBox="0 0 16 16"><path d="M2.5 4h11M4.5 8h7M6.5 12h3"/></symbol>
+  <symbol id="down" viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></symbol>
+  <symbol id="right" viewBox="0 0 16 16"><path d="m6 4 4 4-4 4"/></symbol>
+  <symbol id="drive" viewBox="0 0 16 16"><path d="M2.5 9.5h11V13h-11zM3.5 9.5 5 3.5h6l1.5 6"/></symbol>
+  <symbol id="cloud" viewBox="0 0 16 16"><path d="M4.5 12.5a3 3 0 0 1-.3-6 4 4 0 0 1 7.6 1 2.5 2.5 0 0 1 .2 5z"/></symbol>
+  <symbol id="close" viewBox="0 0 16 16"><path d="m4.5 4.5 7 7M11.5 4.5l-7 7"/></symbol>
+  <symbol id="collapse" viewBox="0 0 16 16"><path d="M3 8h10M8 2v3.5M6 4l2 2 2-2M8 14v-3.5M6 12l2-2 2 2"/></symbol>
+  <symbol id="doc" viewBox="0 0 16 16"><path d="M4 1.5h5.5l3 3v10H4zM9.5 1.5v3h3"/></symbol>
+  <symbol id="pic" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11z"/><circle cx="6" cy="6.5" r="1.2"/><path d="m2.5 11.5 3.5-3 2.5 2 2-1.5 3 2.5"/></symbol>
+  <symbol id="dl" viewBox="0 0 16 16"><path d="M8 1.5v9m0 0L4.5 7M8 10.5 11.5 7M2.5 13.5h11"/></symbol>
+  <symbol id="yes" viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7"/></symbol>
+  <symbol id="no" viewBox="0 0 16 16"><path d="M4.5 8h7"/></symbol>
+  <symbol id="undo" viewBox="0 0 16 16"><path d="M5.5 3.5 2.5 6.5l3 3M2.5 6.5h7a3.5 3.5 0 0 1 0 7H8"/></symbol>
+  <symbol id="redo" viewBox="0 0 16 16"><path d="m10.5 3.5 3 3-3 3M13.5 6.5h-7a3.5 3.5 0 0 0 0 7H8"/></symbol>
+  <symbol id="more" viewBox="0 0 16 16"><path d="M8 3.5h.01M8 8h.01M8 12.5h.01" stroke-width="2.2"/></symbol>
+  <symbol id="monitor" viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-11zM6 13h4M8 10.5V13"/></symbol>
+  <symbol id="play" viewBox="0 0 16 16"><path d="M2.5 3.5h11v9h-11zM6.8 6v4l3.2-2z"/></symbol>
+  <symbol id="note" viewBox="0 0 16 16"><path d="M6.5 11.5V4l6-1.5V10"/><circle cx="5" cy="11.5" r="1.5"/><circle cx="11" cy="10" r="1.5"/></symbol>
+  <symbol id="activity" viewBox="0 0 16 16"><path d="M4 3.5h8v10H4zM6.5 2.5h3v2h-3z"/><circle cx="8" cy="9.5" r="2"/><path d="M8 8.6v1h.8"/></symbol>
+  <symbol id="panelr" viewBox="0 0 16 16"><path d="M2.5 3h11v10h-11zM10 3v10M5 8h2.5M6 6.8 7.3 8 6 9.2"/></symbol>
+  <symbol id="pie" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5V8h5.5"/></symbol>
+  <symbol id="fo" viewBox="0 0 16 16"><path d="M2 4.5a1 1 0 0 1 1-1h3.2l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="shots" viewBox="0 0 16 16"><path d="M3 5.5V3h2.5M10.5 3H13v2.5M13 10.5V13h-2.5M5.5 13H3v-2.5"/></symbol>
+  <symbol id="upc" viewBox="0 0 16 16"><path d="m4 10 4-4 4 4"/></symbol>
+  <symbol id="dots" viewBox="0 0 16 16"><path d="M3.5 4h.01M8 4h.01M12.5 4h.01M3.5 8h.01M8 8h.01M12.5 8h.01M3.5 12h.01M8 12h.01M12.5 12h.01" stroke-width="2"/></symbol>
+  <symbol id="cols" viewBox="0 0 16 16"><path d="M2.5 3.5h11v9h-11zM6.2 3.5v9M9.8 3.5v9"/></symbol>
+  <symbol id="f" viewBox="0 0 20 16"><path d="M1 3a2 2 0 0 1 2-2h4.4l2 2H17a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z"/><path d="M1 6h18v7a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2z" fill="#fff" fill-opacity=".22"/></symbol>
+</svg>
+
+<header class="top">
+  <a class="brand" href="./"><img src="assets/doftar-icon.svg" width="22" height="22" alt=""> Doftar</a>
+  <nav class="links"><a href="#install">Download</a><a href="changelog.html">Changelog</a><a href="https://github.com/mhbsiam/doftar">GitHub</a></nav>
+</header>
+
+<main>
+
+<section class="hero">
+  <img class="hero-icon" src="assets/doftar-icon.svg" width="168" height="168" alt="">
+  <h1>The file manager macOS forgot to ship.</h1>
+  <p class="lede">Tabs, split view, an address bar you can type into and a folder tree with sizes, plus built-in viewers for Parquet, AnnData, SQLite, notebooks, PDFs and code. Free, open source, and blocked from the network.</p>
+  <a class="pill" href="https://github.com/mhbsiam/doftar/releases/latest"><svg class="pi"><use href="#dl"/></svg> Download for Mac</a>
+  <p class="fine">Free and <a href="https://github.com/mhbsiam/doftar">open source</a>. macOS 27 or later, on Apple silicon.</p>
+</section>
+
+<section class="gallery">
+  <h2 class="vh">Doftar, screen by screen</h2>
+  <ul class="shots" tabindex="0" aria-label="Doftar, screen by screen. Scroll sideways for more.">
+    <li>
+    <div class="draw wide">
+      <div class="win home" role="img" aria-label="Doftar's Home page: tabs, an address bar, a command bar with Split, the navigation pane, and Quick access, Drives, Favorites and Recent folders">
+        <div class="tb">
+          <span class="lights"><i></i><i></i><i></i></span>
+          <span class="tab on"><svg class="f c-def"><use href="#f"/></svg>Home<svg class="i x"><use href="#close"/></svg></span>
+          <svg class="i tadd"><use href="#plus"/></svg>
+        </div>
+        <div class="ab">
+          <svg class="i dim"><use href="#back"/></svg><svg class="i dim"><use href="#fwd"/></svg><svg class="i dim"><use href="#up"/></svg><svg class="i"><use href="#refresh"/></svg><svg class="i dim"><use href="#undo"/></svg><svg class="i dim"><use href="#redo"/></svg>
+          <span class="addr"><span class="crumb"><svg class="i"><use href="#home"/></svg>Home</span><span class="grow"></span><svg class="i"><use href="#down"/></svg><svg class="i"><use href="#more"/></svg></span>
+          <span class="srch"><svg class="i"><use href="#search"/></svg>Open a folder to search</span>
+          <svg class="i"><use href="#gear"/></svg>
+        </div>
+        <div class="cb">
+          <svg class="i"><use href="#sidebar"/></svg>
+          <span class="new"><svg class="i"><use href="#plus"/></svg>New</span>
+          <span class="sep"></span>
+          <span class="cbt dim"><svg class="i"><use href="#copy"/></svg>Copy</span>
+          <span class="cbt dim"><svg class="i"><use href="#rename"/></svg>Rename</span>
+          <span class="cbt dim"><svg class="i"><use href="#cut"/></svg>Cut</span>
+          <span class="cbt dim"><svg class="i"><use href="#paste"/></svg>Paste</span>
+          <span class="cbt dim"><svg class="i"><use href="#trash"/></svg>Delete</span>
+          <span class="sep"></span>
+          <span class="cbt"><svg class="i"><use href="#split"/></svg>Split</span>
+          <span class="sep"></span>
+          <span class="cbt dim"><svg class="i"><use href="#share"/></svg>Share</span>
+          <span class="cbt dim"><svg class="i"><use href="#compare"/></svg>Compare</span>
+          <span class="grow"></span>
+          <span class="cbt">Sort<svg class="i acc"><use href="#sort"/></svg></span>
+          <span class="cbt">View<svg class="i"><use href="#list"/></svg></span>
+          <span class="cbt">Filter<svg class="i"><use href="#filter"/></svg></span>
+          <span class="sep"></span>
+          <span class="cbt k">⌘</span><svg class="i"><use href="#activity"/></svg><svg class="i"><use href="#panelr"/></svg>
+        </div>
+        <div class="body">
+          <nav class="nav">
+            <span class="ni on"><svg class="i solid"><use href="#home"/></svg>Home</span>
+            <span class="ni"><svg class="i"><use href="#user"/></svg>User</span>
+            <span class="ni"><svg class="i"><use href="#apps"/></svg>Apps</span>
+            <span class="ni"><svg class="i"><use href="#tag"/></svg>Tags</span>
+            <span class="ni"><svg class="i"><use href="#trash"/></svg>Trash</span>
+            <span class="ng">Quick access<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#monitor"/></svg>Desktop</span>
+            <span class="ni"><svg class="i"><use href="#doc"/></svg>Documents</span>
+            <span class="ni"><svg class="i"><use href="#dl"/></svg>Downloads</span>
+            <span class="ni"><svg class="i"><use href="#shots"/></svg>Screenshots</span>
+            <span class="ng">Favorites<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#fo"/></svg>Thesis</span>
+            <span class="ni"><svg class="i"><use href="#fo"/></svg>Projects</span>
+            <span class="ng">Drives<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><span class="hd sm"></span>Macintosh HD</span>
+            <span class="ng">Cloud Drive<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#cloud"/></svg>iCloud Drive</span>
+            <span class="ng">Tools<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#pie"/></svg>Disk</span>
+            <span class="ni"><svg class="i"><use href="#git"/></svg>Git</span>
+          </nav>
+          <div class="ct">
+            <div class="sh"><svg class="i"><use href="#down"/></svg>Quick access</div>
+            <div class="qa">
+              <span class="qc"><span class="fi c-blue"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#monitor"/></svg></span><span><b>Desktop</b><small>12 items · 48 MB</small></span></span>
+              <span class="qc"><span class="fi c-slate"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#doc"/></svg></span><span><b>Documents</b><small>4,210 items · 25.5 GB</small></span></span>
+              <span class="qc"><span class="fi c-green"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#dl"/></svg></span><span><b>Downloads</b><small>318 items · 2.4 GB</small></span></span>
+              <span class="qc"><span class="fi c-purple"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#play"/></svg></span><span><b>Movies</b><small>41 items · 58.4 GB</small></span></span>
+              <span class="qc"><span class="fi c-pink"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#note"/></svg></span><span><b>Music</b><small>1,206 items · 9.6 GB</small></span></span>
+              <span class="qc"><span class="fi c-orange"><svg class="f big"><use href="#f"/></svg><svg class="g"><use href="#pic"/></svg></span><span><b>Pictures</b><small>2,874 items · 18.3 GB</small></span></span>
+            </div>
+            <div class="sh"><svg class="i"><use href="#down"/></svg>Drives</div>
+            <span class="qc drv"><span class="hd"></span><span><b>Macintosh HD</b><span class="bar"><i style="width:93.3%"></i></span><small>31 GB free of 460 GB</small></span></span>
+            <div class="sh"><svg class="i"><use href="#down"/></svg>Favorites<span class="clear">Clear all</span></div>
+            <div class="rows">
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Thesis</span><span>Oct 27, 2026 4:18 PM</span><span>/Users/alex/Documents</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Projects</span><span>Oct 21, 2026 9:02 AM</span><span>/Users/alex/Documents</span></span>
+            </div>
+            <div class="sh"><svg class="i"><use href="#down"/></svg>Recent folders<span class="clear">Clear all</span></div>
+            <div class="rows">
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Projects</span><span>Oct 29, 2026 9:40 AM</span><span>/Users/alex/Documents</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Thesis</span><span>Oct 29, 2026 9:12 AM</span><span>/Users/alex/Documents</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Lab</span><span>Oct 28, 2026 6:05 PM</span><span>/Users/alex/Documents</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Documents</span><span>Oct 28, 2026 6:04 PM</span><span>/Users/alex</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Applications</span><span>Oct 28, 2026 2:51 PM</span><span>/</span></span>
+              <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>Downloads</span><span>Oct 27, 2026 11:30 AM</span><span>/Users/alex</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="stb"><span class="on"><svg class="i"><use href="#list"/></svg></span><svg class="i"><use href="#dots"/></svg><svg class="i"><use href="#cols"/></svg></div>
+      </div>
+    </div>
+      <h3>Everything in one window</h3>
+      <p>Tabs, a breadcrumb address bar you can type into, and a navigation pane. Mac shortcuts work, and so do the Windows ones you already know.</p>
+    </li>
+    <li>
+    <div class="draw">
+      <div class="win split" role="img" aria-label="Split view: Projects on the left and a Backup folder on the right, each half with its own tabs and address bar">
+        <div class="half">
+          <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="tab on"><svg class="f c-def"><use href="#f"/></svg>Projects</span></div>
+          <div class="ab"><svg class="i"><use href="#back"/></svg><svg class="i"><use href="#up"/></svg><span class="addr"><span class="crumb">Documents</span><svg class="i sm"><use href="#right"/></svg><span class="crumb">Projects</span></span></div>
+          <div class="list">
+            <span class="lh"><span>Name</span><span>Date modified</span><span>Size</span></span>
+            <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>atlas</span><span>Oct 27, 2026</span><span>—</span></span>
+            <span class="r sel"><span><svg class="f c-def"><use href="#f"/></svg>field-notes</span><span>Oct 26, 2026</span><span>—</span></span>
+            <span class="r sel"><span><svg class="i"><use href="#doc"/></svg>budget.xlsx</span><span>Oct 24, 2026</span><span>84 KB</span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>plan.md</span><span>Oct 22, 2026</span><span>6 KB</span></span>
+            <span class="r"><span><svg class="i"><use href="#pic"/></svg>cover.png</span><span>Oct 20, 2026</span><span>1.2 MB</span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>notes.txt</span><span>Oct 18, 2026</span><span>2 KB</span></span>
+          </div>
+        </div>
+        <div class="half">
+          <div class="tb"><span class="tab on"><svg class="f c-def"><use href="#f"/></svg>Backup</span></div>
+          <div class="ab"><svg class="i"><use href="#back"/></svg><svg class="i"><use href="#up"/></svg><span class="addr"><span class="crumb">Backup Drive</span><svg class="i sm"><use href="#right"/></svg><span class="crumb">Projects</span></span></div>
+          <div class="list">
+            <span class="lh"><span>Name</span><span>Date modified</span><span>Size</span></span>
+            <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>atlas</span><span>Oct 27, 2026</span><span>—</span></span>
+            <span class="r drop"><span><svg class="f c-def"><use href="#f"/></svg>field-notes</span><span>Copying…</span><span class="prog"><i></i></span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>plan.md</span><span>Oct 22, 2026</span><span>6 KB</span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>notes.txt</span><span>Oct 18, 2026</span><span>2 KB</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+      <h3>Two folders, side by side</h3>
+      <p>Split view puts two folders in one window, each with its own tabs. Drag between them, or compare the two and copy what one side lacks.</p>
+    </li>
+    <li>
+    <div class="draw">
+      <div class="win side" role="img" aria-label="The folder tree panel beside the Lab folder, listing experiments, microscopy and papers with sizes and size bars">
+        <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="tab on"><svg class="f c-def"><use href="#f"/></svg>Lab</span></div>
+        <div class="body">
+          <div class="list">
+            <span class="lh"><span>Name</span><span>Date modified</span><span>Size</span></span>
+            <span class="r sel"><span><svg class="f c-def"><use href="#f"/></svg>experiments</span><span>Oct 12, 2026</span><span>—</span></span>
+            <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>microscopy</span><span>Sep 30, 2026</span><span>—</span></span>
+            <span class="r"><span><svg class="f c-def"><use href="#f"/></svg>papers</span><span>Sep 02, 2026</span><span>—</span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>README.md</span><span>Nov 20, 2025</span><span>3 KB</span></span>
+          </div>
+          <aside class="panel">
+            <div class="ph"><svg class="f big c-def"><use href="#f"/></svg><span><b>Lab</b><small>/Users/alex/Documents/Lab</small></span><svg class="i"><use href="#collapse"/></svg><svg class="i"><use href="#close"/></svg></div>
+            <div class="tot"><b>30.7 GB</b> 133 items</div>
+            <span class="find"><svg class="i"><use href="#search"/></svg>Find in Lab</span>
+            <div class="tree">
+              <span class="tr on"><svg class="i sm"><use href="#down"/></svg><svg class="f c-def"><use href="#f"/></svg><span>experiments</span><span class="bar"><i style="width:78%"></i></span><span>24.1 GB</span></span>
+              <span class="tr l2"><svg class="i sm"><use href="#right"/></svg><svg class="f c-def"><use href="#f"/></svg><span>2026-fall</span><span class="bar"><i style="width:59%"></i></span><span>18.0 GB</span></span>
+              <span class="tr l2"><span class="sp"></span><svg class="i"><use href="#doc"/></svg><span>results.csv</span><span class="bar"><i style="width:20%"></i></span><span>6.10 GB</span></span>
+              <span class="tr l2"><span class="sp"></span><svg class="i"><use href="#doc"/></svg><span>notes.md</span><span class="bar"><i style="width:2%"></i></span><span>14 KB</span></span>
+              <span class="tr"><svg class="i sm"><use href="#right"/></svg><svg class="f c-def"><use href="#f"/></svg><span>microscopy</span><span class="bar"><i style="width:20%"></i></span><span>6.20 GB</span></span>
+              <span class="tr"><svg class="i sm"><use href="#right"/></svg><svg class="f c-def"><use href="#f"/></svg><span>papers</span><span class="bar"><i style="width:3%"></i></span><span>410 MB</span></span>
+              <span class="tr"><span class="sp"></span><svg class="i"><use href="#doc"/></svg><span>README.md</span><span class="bar"><i style="width:1%"></i></span><span>3 KB</span></span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+      <h3>See what's inside, with sizes</h3>
+      <p>The folder tree lists everything in a folder, with sizes and size bars, so you can tell at a glance what takes the space. Press ⌘⇧E.</p>
+    </li>
+    <li>
+    <div class="draw">
+      <div class="win side" role="img" aria-label="The preview panel showing a photo with its kind, size, location, dimensions and camera">
+        <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="tab on"><svg class="f c-orange"><use href="#f"/></svg>Pictures</span></div>
+        <div class="body">
+          <div class="list">
+            <span class="lh"><span>Name</span><span>Date modified</span><span>Size</span></span>
+            <span class="r"><span><svg class="i"><use href="#pic"/></svg>harbour.heic</span><span>Oct 14, 2026</span><span>2.8 MB</span></span>
+            <span class="r sel"><span><svg class="i"><use href="#pic"/></svg>sunset.heic</span><span>Oct 12, 2026</span><span>3.2 MB</span></span>
+            <span class="r"><span><svg class="i"><use href="#pic"/></svg>ridge.jpg</span><span>Oct 03, 2026</span><span>4.1 MB</span></span>
+            <span class="r"><span><svg class="i"><use href="#pic"/></svg>market.heic</span><span>Sep 21, 2026</span><span>2.5 MB</span></span>
+            <span class="r"><span><svg class="i"><use href="#doc"/></svg>trip.pdf</span><span>Sep 19, 2026</span><span>880 KB</span></span>
+          </div>
+          <aside class="panel pv">
+            <div class="photo"><i></i></div>
+            <div class="pvh"><b>sunset.heic</b><small>HEIC image · 3.2 MB</small><small>Modified Oct 12, 2026 6:41 PM</small></div>
+            <dl>
+              <dt>Where</dt><dd>/Users/alex/Pictures</dd>
+              <dt>Dimensions</dt><dd>4032 × 3024</dd>
+              <dt>Camera</dt><dd>iPhone 16 Pro</dd>
+              <dt>Exposure</dt><dd>1/250 s · f/1.8 · ISO 64</dd>
+              <dt>Opens with</dt><dd>Preview</dd>
+            </dl>
+          </aside>
+        </div>
+      </div>
+    </div>
+      <h3>Look before you open</h3>
+      <p>Select a file and the preview panel shows it, with where it lives, what made it and everything else it says about itself.</p>
+    </li>
+    <li>
+    <div class="draw wide">
+      <div class="win run" role="img" aria-label="Doftar showing the my-app folder, with code . typed into the address bar and a prompt asking: Run this command? code . will run in Terminal in my-app, with Cancel and Run buttons">
+        <div class="tb">
+          <span class="lights"><i></i><i></i><i></i></span>
+          <span class="tab on"><svg class="f c-blue"><use href="#f"/></svg>my-app<svg class="i x"><use href="#close"/></svg></span>
+          <svg class="i tadd"><use href="#plus"/></svg>
+        </div>
+        <div class="ab">
+          <svg class="i"><use href="#back"/></svg><svg class="i dim"><use href="#fwd"/></svg><svg class="i"><use href="#up"/></svg><svg class="i"><use href="#refresh"/></svg><svg class="i dim"><use href="#undo"/></svg><svg class="i dim"><use href="#redo"/></svg>
+          <span class="addr edit">code .<span class="caret"></span></span>
+          <span class="srch"><svg class="i"><use href="#search"/></svg>Search my-app</span>
+          <svg class="i"><use href="#gear"/></svg>
+        </div>
+        <div class="cb">
+          <svg class="i"><use href="#sidebar"/></svg>
+          <span class="new"><svg class="i"><use href="#plus"/></svg>New</span>
+          <span class="sep"></span>
+          <span class="cbt dim"><svg class="i"><use href="#copy"/></svg>Copy</span>
+          <span class="cbt dim"><svg class="i"><use href="#rename"/></svg>Rename</span>
+          <span class="cbt dim"><svg class="i"><use href="#cut"/></svg>Cut</span>
+          <span class="cbt dim"><svg class="i"><use href="#paste"/></svg>Paste</span>
+          <span class="cbt dim"><svg class="i"><use href="#trash"/></svg>Delete</span>
+          <span class="sep"></span>
+          <span class="cbt"><svg class="i"><use href="#split"/></svg>Split</span>
+          <span class="sep"></span>
+          <span class="cbt dim"><svg class="i"><use href="#share"/></svg>Share</span>
+          <span class="cbt dim"><svg class="i"><use href="#compare"/></svg>Compare</span>
+          <span class="grow"></span>
+          <span class="cbt">Sort<svg class="i acc"><use href="#sort"/></svg></span>
+          <span class="cbt">View<svg class="i"><use href="#list"/></svg></span>
+          <span class="cbt">Filter<svg class="i"><use href="#filter"/></svg></span>
+          <span class="sep"></span>
+          <span class="cbt k">⌘</span><svg class="i"><use href="#activity"/></svg><svg class="i"><use href="#panelr"/></svg>
+        </div>
+        <div class="body">
+          <nav class="nav">
+            <span class="ni"><svg class="i"><use href="#home"/></svg>Home</span>
+            <span class="ni"><svg class="i"><use href="#user"/></svg>User</span>
+            <span class="ng">Quick access<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#monitor"/></svg>Desktop</span>
+            <span class="ni"><svg class="i"><use href="#doc"/></svg>Documents</span>
+            <span class="ng">Favorites<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#fo"/></svg>Projects</span>
+            <span class="ng">Tools<svg class="i sm"><use href="#upc"/></svg></span>
+            <span class="ni"><svg class="i"><use href="#pie"/></svg>Disk</span>
+            <span class="ni"><svg class="i"><use href="#git"/></svg>Git</span>
+          </nav>
+          <div class="ct">
+            <div class="list">
+              <span class="lh"><span>Name</span><span>Date modified</span><span>Size</span></span>
+              <span class="r"><span><svg class="f c-blue"><use href="#f"/></svg>src</span><span>Oct 30, 2026</span><span>—</span></span>
+              <span class="r"><span><svg class="f c-blue"><use href="#f"/></svg>tests</span><span>Oct 29, 2026</span><span>—</span></span>
+              <span class="r"><span><svg class="i"><use href="#doc"/></svg>package.json</span><span>Oct 30, 2026</span><span>2 KB</span></span>
+              <span class="r"><span><svg class="i"><use href="#doc"/></svg>README.md</span><span>Oct 21, 2026</span><span>6 KB</span></span>
+              <span class="r"><span><svg class="i"><use href="#doc"/></svg>tsconfig.json</span><span>Sep 14, 2026</span><span>1 KB</span></span>
+            </div>
+            <div class="dlg">
+              <b>Run this command?</b>
+              <span>“code .” will run in Terminal in “my-app”.</span>
+              <span class="btns"><span class="btn">Cancel</span><span class="btn pri">Run</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      <h3>Type a command where you are</h3>
+      <p>Type <code>code .</code>, <code>git pull</code>, <code>claude</code> or any other command into the address bar and press Enter. It runs in your terminal, in the folder you're looking at.</p>
+    </li>
+    <li>
+    <div class="draw">
+      <div class="win" role="img" aria-label="Disk usage: a donut chart of space by kind, and the largest folders with bars">
+        <div class="tb"><span class="lights"><i></i><i></i><i></i></span><span class="tab on"><svg class="i"><use href="#disk"/></svg>Disk</span></div>
+        <div class="dk">
+          <div class="dkh"><b>Disk usage</b><small>Macintosh HD · 429 GB of 460 GB used · scanned just now</small></div>
+          <div class="dkg">
+            <div class="card ov">
+              <svg class="donut" viewBox="0 0 200 200">
+                <circle cx="100" cy="100" r="80" stroke="#ececec"/>
+                <g transform="rotate(-90 100 100)">
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#986f0b" stroke-dasharray="7.9 100"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#0078d4" stroke-dasharray="4.4 100" stroke-dashoffset="-8.3"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#8764b8" stroke-dasharray="13.5 100" stroke-dashoffset="-13.1"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#e3008c" stroke-dasharray="0.9 100" stroke-dashoffset="-27"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#2f9e44" stroke-dasharray="8.5 100" stroke-dashoffset="-28.3"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#ca5010" stroke-dasharray="2.2 100" stroke-dashoffset="-37.2"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#038387" stroke-dasharray="6.1 100" stroke-dashoffset="-39.8"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#8a8886" stroke-dasharray="3.5 100" stroke-dashoffset="-46.3"/>
+                  <circle cx="100" cy="100" r="80" pathLength="100" stroke="#6b6b6b" stroke-dasharray="42.6 100" stroke-dashoffset="-50.2"/>
+                </g>
+                <text x="100" y="98" text-anchor="middle" class="dt">429 GB</text>
+                <text x="100" y="120" text-anchor="middle" class="ds">of 460 GB</text>
+              </svg>
+              <ul class="leg">
+                <li><i style="background:#986f0b"></i>Apps<span>38 GB</span></li>
+                <li><i style="background:#0078d4"></i>Images<span>22 GB</span></li>
+                <li><i style="background:#8764b8"></i>Video<span>64 GB</span></li>
+                <li><i style="background:#e3008c"></i>Audio<span>6 GB</span></li>
+                <li><i style="background:#2f9e44"></i>Documents<span>41 GB</span></li>
+                <li><i style="background:#ca5010"></i>Archives<span>12 GB</span></li>
+                <li><i style="background:#038387"></i>Code<span>30 GB</span></li>
+                <li><i style="background:#8a8886"></i>Other<span>18 GB</span></li>
+                <li><i style="background:#6b6b6b"></i>System &amp; other<span>198 GB</span></li>
+                <li><i style="background:#ececec"></i>Free<span>31 GB</span></li>
+              </ul>
+            </div>
+            <div class="card">
+              <b class="ct-h">Largest folders</b>
+              <ul class="bars">
+                <li><span>Library</span><span class="bar"><i style="width:100%"></i></span><span>96.2 GB</span></li>
+                <li><span>Movies</span><span class="bar"><i style="width:61%"></i></span><span>58.4 GB</span></li>
+                <li><span>Developer</span><span class="bar"><i style="width:35%"></i></span><span>34.1 GB</span></li>
+                <li><span>Documents</span><span class="bar"><i style="width:27%"></i></span><span>25.5 GB</span></li>
+                <li><span>Pictures</span><span class="bar"><i style="width:19%"></i></span><span>18.3 GB</span></li>
+                <li><span>Music</span><span class="bar"><i style="width:10%"></i></span><span>9.6 GB</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      <h3>Find what fills your disk</h3>
+      <p>Disk usage scans your home folder and shows where the space went, by kind of file and by folder, down to the largest files and duplicate copies.</p>
+    </li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2>And a lot more</h2>
+  <p>Things that need another app, or a Terminal command, in Finder.</p>
+  <ul class="grid">
+    <li><h3>Built-in viewers</h3><p>Images, PDFs, Markdown, text and code, CSV tables and video, without leaving Doftar.</p></li>
+    <li><h3>Tabs and windows</h3><p>Each tab keeps its own history. Drag one out into a new window, or onto another.</p></li>
+    <li><h3>Search and filter</h3><p>Type to filter the folder, press Enter to search subfolders, filter by kind and date.</p></li>
+    <li><h3>Command palette</h3><p>Every command a few keystrokes away, with a sheet of every shortcut.</p></li>
+    <li><h3>Drag and drop</h3><p>To and from Finder, Mail or a browser. Hover a folder or tab to open it.</p></li>
+    <li><h3>Archives</h3><p>Compress to ZIP. Extract zip, tar, 7-Zip, RAR, ISO and more.</p></li>
+    <li><h3>Media details</h3><p>Duration, codec, resolution and camera columns, and a shot list export.</p></li>
+    <li><h3>Properties</h3><p>Size on disk, permissions, camera and media details, and SHA-256 checksums.</p></li>
+    <li><h3>Terminal</h3><p>Open any folder in Terminal, iTerm2, Warp, Ghostty, WezTerm or Zentty.</p></li>
+    <li><h3>Tags and screenshots</h3><p>Pages that gather every file with a tag, or every screenshot you've taken.</p></li>
+    <li><h3>Agent skills</h3><p>Every <code>SKILL.md</code> across your coding agents, on one page.</p></li>
+    <li><h3>Made to read</h3><p>Folder colors, adjustable text size, AA contrast and 120 Hz on ProMotion.</p></li>
+  </ul>
+  <p class="more"><a href="https://github.com/mhbsiam/doftar/blob/main/docs/REFERENCE.md">See every feature and shortcut</a></p>
+</section>
+
+<section class="block">
+  <h2>What Finder leaves out</h2>
+  <p>Finder does a lot well. These are the parts Doftar adds.</p>
+  <div class="cmp-wrap">
+    <table class="cmp">
+      <thead><tr><th scope="col"><span class="vh">Feature</span></th><th scope="col">Finder</th><th scope="col">Doftar</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Two folders side by side</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Compare two folders and copy what's missing</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Cut and paste files with ⌘X</th><td><span class="part">Partly</span><small>⌥⌘V to move</small></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">An address bar you can type a path into</th><td><span class="part">Partly</span><small>Go to Folder dialog</small></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Folder tree with sizes</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Disk usage by folder and kind</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Undo history with an activity log</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Batch rename with regex and numbering</th><td><span class="part">Partly</span><small>No regex</small></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Summaries of AnnData, Parquet, SQLite and HDF5</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Edit text and code with syntax colors</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Compare two files line by line</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Git status on files</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">File checksums</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Remove an app with its leftovers</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+        <tr><th scope="row">Windows shortcuts (F2, Ctrl+C, Delete)</th><td><svg class="m no"><use href="#no"/></svg><span class="vh">No</span></td><td><svg class="m yes"><use href="#yes"/></svg><span class="vh">Yes</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="block">
+  <h2>Built to keep your files safe</h2>
+  <p>Scripts and installers ask before they run. Files unzipped from a download are still checked by Gatekeeper. System and home folders can't be moved or deleted. And Doftar has no networking code. A sandbox blocks its main process from the network, and its built-in previews can't load anything from the web.</p>
+  <p class="more"><a href="https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md">Read how Doftar handles security</a></p>
+</section>
+
+<section class="band" id="install">
+  <h2>Install in a minute</h2>
+  <p>Doftar isn't notarized yet, so macOS asks you to allow it once.</p>
+  <a class="pill pill-light get" href="https://github.com/mhbsiam/doftar/releases/latest"><svg class="pi"><use href="#dl"/></svg> Download Doftar</a>
+  <ol class="steps">
+    <li><a href="assets/install/1-download.png"><img src="assets/install/1-download.png" width="548" height="450" loading="lazy" decoding="async" alt="A GitHub release page with doftar_v1.0.0_stable_macos.dmg highlighted under Assets"></a><strong><span class="n">1</span>Download the DMG</strong><p>Click the <b>.dmg</b> under Assets on the release page.</p></li>
+    <li><a href="assets/install/2-drag.png"><img src="assets/install/2-drag.png" width="548" height="450" loading="lazy" decoding="async" alt="The Doftar disk image window: drag the Doftar icon onto the Applications folder"></a><strong><span class="n">2</span>Drag to Applications</strong><p>Open the DMG and drag Doftar onto the Applications folder.</p></li>
+    <li><a href="assets/install/3-done.png"><img src="assets/install/3-done.png" width="368" height="450" loading="lazy" decoding="async" alt="The “Doftar” Not Opened dialog, with Done highlighted"></a><strong><span class="n">3</span>Open Doftar, click Done</strong><p>macOS can’t verify it yet. Click <b>Done</b>, not Move to Trash.</p></li>
+    <li><a href="assets/install/4-settings.png"><img src="assets/install/4-settings.png" width="688" height="450" loading="lazy" decoding="async" alt="System Settings, Privacy &amp; Security: the sidebar item and Open Anyway highlighted next to the message that Doftar was blocked"></a><strong><span class="n">4</span>Allow it in Settings</strong><p>Open System Settings, scroll the sidebar to <b>Privacy &amp; Security</b>, then scroll down the page and click <b>Open Anyway</b>.</p></li>
+    <li><a href="assets/install/5-open-anyway.png"><img src="assets/install/5-open-anyway.png" width="368" height="450" loading="lazy" decoding="async" alt="The Open “Doftar”? dialog, with Open Anyway highlighted"></a><strong><span class="n">5</span>Confirm</strong><p>macOS asks once more. Click <b>Open Anyway</b>.</p></li>
+    <li><a href="assets/install/6-password.png"><img src="assets/install/6-password.png" width="368" height="450" loading="lazy" decoding="async" alt="The Touch ID prompt to continue with Privacy &amp; Security, with Use Password highlighted"></a><strong><span class="n">6</span>Touch ID or password</strong><p>Use Touch ID, or click <b>Use Password…</b> You only do this once.</p></li>
+  </ol>
+  <p class="term">Prefer Terminal? It skips Gatekeeper&#39;s check, so first verify the DMG with <code>shasum -a 256 -c SHA256SUMS</code> (from the same release), then run <code>xattr -cr /Applications/Doftar.app</code>.</p>
+</section>
+
+<section class="block name">
+  <svg class="office" viewBox="0 0 360 214" role="img" aria-label="A cartoon office: a filing cabinet with an archive box on top, binders on a wall shelf, and a desk under a teetering stack of papers, one sheet flying off, beside a mug of coffee, a lamp and a wastebasket">
+    <g fill="#fff" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8 201c82-2 262 2 344-1" fill="none"/>
+      <!-- Shelf and binders -->
+      <path d="M156 14h12v32h-12zM168 18h12v28h-12zM180 12h12v34h-12zM192 16h12v30h-12zM206 46l14-28 11 5-13 23zM236 38h22v8h-22z"/>
+      <path d="M150 46h112M162 46v7l7-7M250 46v7l-7-7" fill="none"/>
+      <path d="M162 38h.01M174 38h.01M186 38h.01M198 38h.01" stroke-width="4"/>
+      <!-- Filing cabinet, archive box on top -->
+      <rect x="36" y="58" width="54" height="20"/>
+      <rect x="33" y="54" width="60" height="8" rx="1.5"/>
+      <rect x="55" y="67" width="16" height="5" rx="2.5"/>
+      <rect x="28" y="78" width="70" height="122" rx="3"/>
+      <rect x="34" y="84" width="58" height="28" rx="2"/>
+      <rect x="34" y="124" width="58" height="28" rx="2"/>
+      <rect x="34" y="164" width="58" height="28" rx="2"/>
+      <path d="M57 89h12v6h-12zM57 129h12v6h-12zM57 169h12v6h-12z"/>
+      <path d="M55 101h16M55 141h16M55 181h16" stroke-width="4"/>
+      <path d="M44 84l3-9 9 2-2 7M74 84l5-7 8 4-3 3" />
+      <!-- Desk -->
+      <rect x="128" y="136" width="8" height="64"/>
+      <rect x="258" y="136" width="52" height="64"/>
+      <path d="M258 157h52M258 178h52M278 147h12M278 168h12M278 189h12" fill="none"/>
+      <rect x="118" y="128" width="200" height="9" rx="2"/>
+      <!-- Wastebasket and a crumpled page -->
+      <path d="M198 172h30l-4 28h-22z"/>
+      <path d="M207 177l2 19M218 177l-1 19" fill="none" stroke-width="1.6"/>
+      <path d="M236 200l-3-6 4-5 6 1 3 5-3 5z"/>
+      <!-- The teetering stack -->
+      <rect x="142" y="121" width="60" height="7" rx="1.5"/>
+      <rect x="146" y="114" width="60" height="7" rx="1.5"/>
+      <rect x="140" y="107" width="60" height="7" rx="1.5"/>
+      <rect x="147" y="100" width="60" height="7" rx="1.5"/>
+      <rect x="142" y="93" width="60" height="7" rx="1.5"/>
+      <rect x="149" y="86" width="60" height="7" rx="1.5"/>
+      <rect x="145" y="79" width="60" height="7" rx="1.5"/>
+      <rect x="152" y="72" width="60" height="7" rx="1.5"/>
+      <rect x="149" y="61" width="58" height="11" rx="2"/>
+      <path d="M155 61v11M207 102h7v4M142 96h-6v4" fill="none"/>
+      <!-- A sheet flying off -->
+      <g transform="rotate(16 246 84)">
+        <rect x="237" y="72" width="18" height="24" rx="1"/>
+        <path d="M241 79h10M241 84h10M241 89h6" fill="none" stroke-width="1.6"/>
+      </g>
+      <path d="M214 66q8-4 15-1M218 74q6-3 12-1" fill="none" stroke-width="1.8"/>
+      <!-- Mug -->
+      <path d="M220 110h18v14q0 4-4 4h-10q-4 0-4-4z"/>
+      <path d="M238 114q7 0 7 5t-7 5M225 104q-3-4 0-8t0-8M232 104q-3-4 0-8" fill="none"/>
+      <!-- Lamp -->
+      <path d="M280 128q13-8 26 0M293 124l-9-28 16-18" fill="none"/>
+      <path d="M296 74l16-8 14 20-18 8z"/>
+    </g>
+  </svg>
+  <h2 lang="bn">দফতর</h2>
+  <p>Doftar is a stylized spelling of <i>doftor</i>, Bengali for an office, borrowed from its Persian root <i>daftar</i>, a ledger where records were kept. Fitting, for a place that keeps your files.</p>
+  <p class="fine">It started as a weekend fix for everyday frustration with Finder.</p>
+</section>
+
+</main>
+
+<footer class="foot">
+  <p>© 2026 Hasanul Banna Siam
+    <span>·</span> <a href="https://github.com/mhbsiam/doftar">GitHub</a>
+    <span>·</span> <a href="https://github.com/mhbsiam/doftar/blob/main/TERMS.md">Terms</a>
+    <span>·</span> <a href="https://github.com/mhbsiam/doftar/blob/main/LICENSE">Apache 2.0</a>
+  </p>
+  <p class="legal">Doftar is a file manager that copies, moves, overwrites and deletes files, so keep backups.</p>
+  <p class="legal"><i>macOS</i> and <i>Finder</i> are trademarks of Apple Inc.; <i>Windows</i> and <i>Explorer</i> are trademarks of Microsoft Corporation. Doftar is an independent project, not affiliated with or endorsed by either.</p>
+</footer>
+
+<script>
+// Move the screens on every 5s. Hover or focus pauses; any swipe, click, key or sideways scroll stops it for good.
+(() => {
+  const row = document.querySelector('.shots');
+  if (!row || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  let paused = false, stopped = false;
+  const stop = () => { stopped = true; };
+  row.addEventListener('pointerenter', () => { paused = true; });
+  row.addEventListener('pointerleave', () => { paused = false; });
+  row.addEventListener('focusin', () => { paused = true; });
+  row.addEventListener('focusout', () => { paused = false; });
+  row.addEventListener('pointerdown', stop);
+  row.addEventListener('keydown', stop);
+  row.addEventListener('touchstart', stop, { passive: true });
+  row.addEventListener('wheel', e => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) stop(); }, { passive: true });
+  setInterval(() => {
+    if (stopped || paused || document.hidden) return;
+    const mid = row.getBoundingClientRect().left + row.clientWidth / 2;
+    const slides = [...row.children];
+    const centre = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; };
+    const i = slides.reduce((best, el, j) => Math.abs(centre(el) - mid) < Math.abs(centre(slides[best]) - mid) ? j : best, 0);
+    glide(centre(slides[(i + 1) % slides.length]) - mid);
+  }, 5000);
+  // Our own eased scroll: the browser's smooth scroll is short and can't be slowed. Snapping is off meanwhile, or each step would snap back.
+  function glide(by) {
+    const from = row.scrollLeft, t0 = performance.now(), ms = 1100;
+    row.style.scrollSnapType = 'none';
+    requestAnimationFrame(function step(now) {
+      const t = Math.min((now - t0) / ms, 1);
+      row.scrollLeft = from + by * (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
+      if (t < 1 && !stopped) requestAnimationFrame(step); else row.style.scrollSnapType = '';
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

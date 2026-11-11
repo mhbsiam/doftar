@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doftar</title>
+    <meta name="color-scheme" content="light dark" />
+    <!-- No inline <style> here: Tauri adds a CSP hash for inline styles, which
+         makes browsers ignore 'unsafe-inline' and blocks Fluent's runtime
+         styles. The pre-paint background lives in src/global.css. -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

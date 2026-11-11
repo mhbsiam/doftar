@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # The release workflow runs these checks first.
+  workflow_call:
+  schedule:
+    # Weekly, to catch new advisories against unchanged dependencies.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          workspaces: src-tauri
+
+      - name: Check the version is the same everywhere
+        # The release is tagged from tauri.conf.json. `cargo check --locked` below ties Cargo.lock to Cargo.toml.
+        run: |
+          node -e '
+            const v = [require("./package.json").version, require("./src-tauri/tauri.conf.json").version,
+              require("fs").readFileSync("src-tauri/Cargo.toml", "utf8").match(/^version = "(.+)"/m)[1]];
+            if (new Set(v).size > 1) { console.log(`::error::Versions differ (package.json, tauri.conf.json, Cargo.toml): ${v.join(", ")}`); process.exit(1); }
+          '
+
+      - name: Install dependencies
+        # Use lockfile versions. Skip install scripts.
+        run: npm ci --ignore-scripts
+
+      - name: Type-check and build frontend
+        run: npm run build
+
+      - name: Lint frontend
+        run: npm run lint
+
+      - name: Test frontend
+        run: npm test
+
+      - name: Screenshot tests
+        # The reference images were made on a developer Mac, and fonts can render differently on the runner.
+        # Until this step has passed here, a mismatch is reported but does not fail CI or block a release.
+        continue-on-error: true
+        run: |
+          npx playwright install webkit
+          npm run test:visual
+
+      - name: Check, lint and test Rust core
+        # rust-toolchain.toml pins the compiler and clippy, so lints do not change under us.
+        run: |
+          cargo check --locked --manifest-path src-tauri/Cargo.toml
+          cargo clippy --locked --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
+          cargo test --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=high
+
+      - name: Check no networking package reached the frontend
+        # Doftar is offline. None of these may be installed, even indirectly.
+        run: |
+          for p in @tauri-apps/plugin-http @tauri-apps/plugin-updater @tauri-apps/plugin-websocket @tauri-apps/plugin-shell; do
+            if npm ls "$p" --depth=100 >/dev/null 2>&1; then
+              echo "::error::$p is installed; Doftar makes no network connections"
+              exit 1
+            fi
+          done
+
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2
+        with:
+          tool: cargo-audit,cargo-deny
+
+      - name: Audit Rust dependencies
+        run: cargo audit --file src-tauri/Cargo.lock
+
+      - name: Check licenses and the no-network ban list
+        # deny.toml at the repo root: advisories, MIT-compatible licenses, and a ban on HTTP, TLS and WebSocket crates for the macOS targets.
+        run: cargo deny --manifest-path src-tauri/Cargo.toml check

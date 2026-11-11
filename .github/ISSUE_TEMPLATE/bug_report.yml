@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in Doftar doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Security problems go through
+        [SECURITY.md](https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md), not here.
+  - type: input
+    id: version
+    attributes:
+      label: Doftar version
+      description: Doftar → About Doftar
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.3"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a folder with …
+        2. Select …
+        3. Press …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: checkboxes
+    id: data-loss
+    attributes:
+      label: Files
+      options:
+        - label: This bug lost, damaged or moved files somewhere unexpected
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or anything else
+      description: Drag images or a screen recording here.

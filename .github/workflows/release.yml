@@ -1,0 +1,143 @@
+name: Release
+
+# Runs only from the Actions tab. First raise `version` in package.json, src-tauri/tauri.conf.json,
+# src-tauri/Cargo.toml and the doftar entry in Cargo.lock. The release is tagged v<version>.
+# The release stays a draft until the DMG, SHA256SUMS and attestation exist. The last step publishes it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  # For the build provenance attestation of each release.
+  id-token: write
+  attestations: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: macos-latest
+    # Protect this environment in the repository settings with required reviewers. A release then needs a second reviewer.
+    environment: release
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        # Use lockfile versions. Skip install scripts.
+        run: npm ci --ignore-scripts
+
+      - name: Check the Rust lockfile is current
+        run: cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+
+      # With no certificate in the `release` environment the build stays ad-hoc signed, as before.
+      # The secrets: APPLE_CERTIFICATE (the Developer ID Application .p12, base64), APPLE_CERTIFICATE_PASSWORD,
+      # APPLE_SIGNING_IDENTITY ("Developer ID Application: Name (TEAMID)"), and for notarization APPLE_ID,
+      # APPLE_PASSWORD (an app-specific password) and APPLE_TEAM_ID. Tauri reads them from the environment,
+      # signs with the identity instead of "-" and notarizes and staples the app. Only this job talks to Apple.
+      - name: Use the Developer ID certificate, if the environment has one
+        id: cert
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "No Developer ID certificate: building ad-hoc signed."
+            echo "gatekeeper=Doftar isn't notarized, so macOS blocks the first launch. Open Doftar and click **Done**. Then open **System Settings → Privacy & Security**, scroll down, click **Open Anyway**, and click **Open**. From Terminal, \`xattr -cr /Applications/Doftar.app\` does the same." >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # An empty variable would replace the ad-hoc identity with nothing, so export them only here.
+          for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!v}" ] || { echo "::error::$v is not set in the release environment"; exit 1; }
+            echo "$v=${!v}" >> "$GITHUB_ENV"
+          done
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "gatekeeper=Open Doftar. It is signed and notarized, so macOS opens it after one confirmation." >> "$GITHUB_OUTPUT"
+
+      - name: Build and upload to a draft release
+        id: build
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Doftar v__VERSION__
+          # The tag is created on publish. Pin it to the built commit.
+          releaseCommitish: ${{ github.sha }}
+          releaseBody: |
+            Doftar is a free, offline file manager for macOS. It runs on Apple silicon Macs with macOS 27 or later. What's new: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/v__VERSION__/CHANGELOG.md).
+
+            ## Install
+
+            1. Download `doftar_v__VERSION___stable_macos.dmg` and `SHA256SUMS` below.
+            2. Check the download. In the folder you saved both files to, run:
+               ```
+               shasum -a 256 -c SHA256SUMS
+               gh attestation verify doftar_v__VERSION___stable_macos.dmg --repo ${{ github.repository }}
+               ```
+               The first should print `OK`; the second confirms the DMG was built by this repository's release workflow.
+            3. Open the DMG and drag **Doftar** into **Applications**, replacing any older copy.
+            4. ${{ steps.cert.outputs.gatekeeper }}
+
+            Doftar makes no network connections: no update check, telemetry or crash reporting. To update, download a new release and replace the app.
+          releaseDraft: true
+          prerelease: false
+          args: --target aarch64-apple-darwin
+
+      - name: Check that Gatekeeper accepts the notarized app
+        if: steps.cert.outputs.signed == 'true'
+        run: |
+          app=src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Doftar.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          xcrun stapler validate "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+
+      - name: Keep only the DMG and write its checksum
+        id: sums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ steps.build.outputs.appVersion }}
+        run: |
+          # tauri-action uploads the DMG under its own name and a tarball of Doftar.app. Replace both with the renamed DMG.
+          gh release view "$TAG" --json assets -q '.assets[].name' |
+            while read -r name; do gh release delete-asset "$TAG" "$name" --yes; done
+          cd src-tauri/target/aarch64-apple-darwin/release/bundle/dmg
+          dmg="doftar_${TAG}_stable_macos.dmg"
+          mv Doftar_*_aarch64.dmg "$dmg"
+          shasum -a 256 "$dmg" > SHA256SUMS
+          gh release upload "$TAG" "$dmg"
+          cat SHA256SUMS
+          echo "dir=$PWD" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
+        with:
+          subject-path: |
+            ${{ steps.sums.outputs.dir }}/*.dmg
+            ${{ steps.sums.outputs.dir }}/SHA256SUMS
+
+      - name: Attach checksums and publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: v${{ steps.build.outputs.appVersion }}
+        run: |
+          gh release upload "$TAG" "${{ steps.sums.outputs.dir }}/SHA256SUMS" --clobber
+          # Keep it a draft until now, so nobody downloads a release without checksums.
+          gh release edit "$TAG" --draft=false
