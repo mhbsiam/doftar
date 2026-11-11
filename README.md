@@ -16,6 +16,8 @@
   <img src="assets/screenshot.png" width="720" alt="Doftar showing the Home page with Quick access, Drives, Favorites and Recent folders" />
 </p>
 
+https://github.com/user-attachments/assets/e5379363-4909-4fb3-9372-5589b93f157a
+
 Doftar is a Mac file manager that opens your data. Parquet, AnnData, SQLite,
 notebooks, PDFs and code open in built-in viewers, next to the folders they
 live in. It runs on Apple silicon Macs, is tested on macOS 27 and needs nothing
