@@ -33,7 +33,7 @@ import { useUI } from "./stores/ui";
 import { currentTags, useTags, withTagAdded } from "./stores/tags";
 import { appName, currentEditors, currentTerminals, appCommand, type TerminalApp } from "./stores/terminals";
 import type { AppInfo, FileEntry, Location, OpResult, Progress, Resolutions, ShareAnchor, Step, Tag, TrashStep } from "./types";
-import { extOf, isDataFile, isFolder, isMarkdown, isPlainText, isPlayableVideo, isViewerImage } from "./util/kinds";
+import { extOf, isDataFile, isFolder, isMarkdown, isPlainText, isPlayableAudio, isPlayableVideo, isViewerImage } from "./util/kinds";
 import { formatSize, normalizePath } from "./util/format";
 import { shotListCsv } from "./util/shotList";
 import { isMedia } from "./stores/media";
@@ -284,10 +284,11 @@ export function togglePreview() {
   setPreviewOpen(!previewOpen);
 }
 
-function viewerOrder(path: string): string[] | null {
+/** The files beside `path` in the view, in view order, that `fits` takes. */
+function viewerOrder(path: string, fits: (e: FileEntry) => boolean = (e) => isViewerImage(e.ext)): string[] | null {
   const dir = parentOf(path);
   const order = getViewEntries()
-    .filter((e) => !e.isDir && isViewerImage(e.ext) && parentOf(e.path) === dir)
+    .filter((e) => !e.isDir && fits(e) && parentOf(e.path) === dir)
     .map((e) => e.path);
   return order.includes(path) ? order : null;
 }
@@ -323,6 +324,11 @@ async function launch(path: string): Promise<boolean> {
   }
   if (isPlayableVideo(ext)) {
     await openVideoFromListing(path);
+    return true;
+  }
+  // Cloud-only tracks stay out of the playlist. The player reads them without the backend's check.
+  if (isPlayableAudio(ext)) {
+    await openVideoFromListing(path, viewerOrder(path, (e) => isPlayableAudio(e.ext) && !e.isDataless));
     return true;
   }
   // A text extension can be a binary format too (.ts video).

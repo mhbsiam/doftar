@@ -81,7 +81,7 @@ Doftar in **System Settings → Privacy & Security → Files and Folders**.
 
 - **Browse:** tabs, split view, list, column and icon views, a folder tree with sizes, search and filters, Tags and Screenshots pages, and a command palette.
 - **Manage files:** cut, copy and paste shared with Finder, undo and an activity log, batch rename, archives, and drag and drop.
-- **View:** images, PDFs, Markdown, code, video, CSV, Parquet, Arrow, JSON, SQLite, Excel, AnnData/HDF5, NumPy, Jupyter notebooks and model weights.
+- **View:** images, PDFs, Markdown, code, video, audio, CSV, Parquet, Arrow, JSON, SQLite, Excel, AnnData/HDF5, NumPy, Jupyter notebooks and model weights.
 - **Edit and compare:** a native text editor, and side-by-side compare for folders, text, Word files, tables and AnnData.
 - **Tools:** disk usage and duplicate files, Git status and history, agent skills, an app uninstaller, and opening folders in your terminal or code editor.
 

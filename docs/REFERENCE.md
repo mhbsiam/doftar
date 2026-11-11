@@ -82,7 +82,7 @@ layout is in [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Jupyter notebooks**: Markdown, code and saved outputs (text, plots, errors); nothing in the notebook runs
 - **Model weights**: `.safetensors` and `.gguf` tensors, metadata, parameter count and quantization, read from the header only
 - **Spreadsheets**: Excel and OpenDocument sheets, from **Preview in Doftar** on the right-click menu
-- **Video**: a built-in player
+- **Video and audio**: a built-in player that plays a folder's tracks in order
 - **Text editor**: a native editor that keeps line endings and BOM as they were
 - **Open in Preview** or **Open with** another app is always one click away
 

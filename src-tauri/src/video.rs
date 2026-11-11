@@ -1,4 +1,4 @@
-//! Video player window. WebKit's player plays the file through the asset protocol.
+//! Video and audio player window. WebKit's player plays the file through the asset protocol.
 //! The window is made hidden at launch and hidden on close, so a video opens without waiting for a webview.
 
 use crate::lock::Locked;
@@ -14,8 +14,8 @@ use crate::zoom::CssRect;
 
 pub const LABEL: &str = "video";
 
-/// Keep in step with `VIDEO_EXTS` in src/util/kinds.ts and the asset scope in tauri.conf.json.
-const EXTS: &[&str] = &["mp4", "m4v", "mov", "webm"];
+/// Keep in step with `VIDEO_EXTS` and `AUDIO_EXTS` in src/util/kinds.ts and the asset scope in tauri.conf.json.
+const EXTS: &[&str] = &["mp4", "m4v", "mov", "webm", "mp3", "m4a", "aac", "wav", "flac", "aif", "aiff"];
 
 /// Held while the window is looked up, made or marked ready. An open cannot then slip between the page listening and taking the opens it missed.
 static OPENING: Mutex<()> = Mutex::new(());
@@ -59,12 +59,14 @@ pub fn prewarm(app: &AppHandle) {
 }
 
 /// `from` is where the calling page draws the file icon. The window zooms up from near it.
+/// `order` is the folder's tracks, for next and previous. The page plays only what the asset scope allows.
 #[tauri::command]
 pub async fn open_video(
     app: AppHandle,
     window: WebviewWindow,
     path: String,
     from: Option<CssRect>,
+    order: Option<Vec<String>>,
 ) -> Result<(), String> {
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
@@ -80,7 +82,7 @@ pub async fn open_video(
     if crate::thumbs::is_dataless(&meta) {
         return Err("the file is not downloaded".into());
     }
-    let msg = serde_json::json!({ "path": path });
+    let msg = serde_json::json!({ "path": path, "order": order });
     let _guard = OPENING.locked();
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let win = match app.get_webview_window(LABEL) {
@@ -149,6 +151,8 @@ mod tests {
     fn plays_only_what_webkit_plays() {
         assert!(is_video(Path::new("/a/clip.MP4")));
         assert!(is_video(Path::new("/a/clip.webm")));
+        assert!(is_video(Path::new("/a/song.FLAC")));
+        assert!(!is_video(Path::new("/a/song.ogg")));
         assert!(!is_video(Path::new("/a/clip.mkv")));
         assert!(!is_video(Path::new("/a/clip")));
     }

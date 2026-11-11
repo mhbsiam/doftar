@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "video",
-  "description": "Capabilities for the video player window. A video WebKit can't play goes to its default app through open_path, which never runs a program.",
+  "description": "Capabilities for the video and audio player window. The thumbnail shows a track's artwork. A video WebKit can't play goes to its default app through open_path, which never runs a program.",
   "windows": ["video"],
   "permissions": [
     "core:default",
@@ -17,6 +17,7 @@
     "allow-log-ui-error",
     "allow-open-path",
     "allow-show-zoomed",
-    "allow-video-ready"
+    "allow-video-ready",
+    "allow-thumbnail"
   ]
 }

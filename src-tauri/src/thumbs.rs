@@ -23,7 +23,8 @@ const EXTS: &[&str] = &[
 
 const QL_EXTS: &[&str] = &[
     "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "rtf", "rtfd",
-    "mov", "mp4", "m4v", "avi", "mkv", "webm", "mp3", "m4a", "svg", "psd", "ai", "eps", "epub",
+    "mov", "mp4", "m4v", "avi", "mkv", "webm", "mp3", "m4a", "aac", "wav", "flac", "aif", "aiff",
+    "svg", "psd", "ai", "eps", "epub",
 ];
 const QL_MAX_CONCURRENT: usize = 2;
 const PDF_MAX_CONCURRENT: usize = 2;

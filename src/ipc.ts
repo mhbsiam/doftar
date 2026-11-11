@@ -371,11 +371,11 @@ export const api = {
     invoke<boolean>("open_pdf", { path, from }),
   pdfAction: (action: PdfAction) => invoke<void>("pdf_action", { action }),
   pdfState: () => invoke<PdfState>("pdf_state"),
-  /** `from` is where this page draws the icon. */
-  openVideo: (path: string, from: Rect | null = null) =>
-    invoke<void>("open_video", { path, from }),
-  /** Returns the video requested before the player was ready. */
-  videoReady: () => invoke<{ path: string } | null>("video_ready"),
+  /** `from` is where this page draws the icon. `order` is the folder's tracks, for next and previous. */
+  openVideo: (path: string, from: Rect | null = null, order: string[] | null = null) =>
+    invoke<void>("open_video", { path, from, order }),
+  /** Returns the file requested before the player was ready. */
+  videoReady: () => invoke<{ path: string; order: string[] | null } | null>("video_ready"),
   /** `icon` is the SVG of the icon at `from`. Resolves true if it flies into the reader. */
   openReader: (path: string, from: Rect | null = null, icon: string | null = null, edit = false) =>
     invoke<boolean>("open_reader", { path, from, icon, edit }),

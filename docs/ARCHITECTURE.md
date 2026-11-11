@@ -13,7 +13,7 @@ src/                      React frontend
 ├── viewerMain.tsx        # Image viewer window
 ├── readerMain.tsx        # Reader window (Markdown, code, data, notebooks)
 ├── pdfMain.tsx           # PDF viewer window
-├── videoMain.tsx         # Video player window
+├── videoMain.tsx         # Video and audio player window
 ├── App.tsx               # Title bar, command bar, panes, dialogs
 ├── ipc.ts                # Typed wrappers for every Rust command
 ├── actions.ts            # Commands the menus, shortcuts and palette share

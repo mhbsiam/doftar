@@ -217,7 +217,8 @@ const IMAGE_EXTS = new Set([
 
 const QL_EXTS = new Set([
   "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "rtf", "rtfd",
-  "mov", "mp4", "m4v", "avi", "mkv", "webm", "mp3", "m4a", "svg", "psd", "ai", "eps", "epub",
+  "mov", "mp4", "m4v", "avi", "mkv", "webm", "mp3", "m4a", "aac", "wav", "flac", "aif", "aiff",
+  "svg", "psd", "ai", "eps", "epub",
 ]);
 
 export function isQuickLookExt(ext: string): boolean {
@@ -243,6 +244,13 @@ const VIDEO_EXTS = new Set(["mp4", "m4v", "mov", "webm"]);
 
 export function isPlayableVideo(ext: string): boolean {
   return VIDEO_EXTS.has(ext.toLowerCase());
+}
+
+/** Audio that Doftar plays itself. Keep in step with `EXTS` in src-tauri/src/video.rs. */
+const AUDIO_EXTS = new Set(["mp3", "m4a", "aac", "wav", "flac", "aif", "aiff"]);
+
+export function isPlayableAudio(ext: string): boolean {
+  return AUDIO_EXTS.has(ext.toLowerCase());
 }
 
 /** Markdown, which the reader formats. Keep in step with `MARKDOWN_EXTS` in src-tauri/src/reader.rs. */

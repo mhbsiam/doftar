@@ -42,8 +42,8 @@ export function openPdfFromListing(path: string) {
 }
 
 /** Nothing flies. The video window zooms from the icon. */
-export function openVideoFromListing(path: string) {
-  return openFromListing(path, (from) => api.openVideo(path, from).then(() => false));
+export function openVideoFromListing(path: string, order: string[] | null = null) {
+  return openFromListing(path, (from) => api.openVideo(path, from, order).then(() => false));
 }
 
 /** Text and Markdown files have no thumbnail, so their icon flies. */

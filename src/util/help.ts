@@ -321,13 +321,14 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         ],
       },
       {
-        title: "PDF, Markdown and video",
+        title: "PDF, Markdown, video and audio",
         points: [
           "PDFs: search, two pages side by side, thumbnails and passwords. Use Open in Preview to edit.",
           "Markdown: tables, footnotes, task lists and math. HTML in a document shows as text and never runs.",
           "Video plays MP4, M4V, MOV and WebM.",
+          "Audio plays MP3, M4A, AAC, WAV, FLAC and AIFF, then the next track in the folder.",
         ],
-        limits: ["MKV and AVI don't play in Doftar. Use Open with."],
+        limits: ["MKV, AVI, OGG and Opus don't play in Doftar. Use Open with."],
       },
       {
         title: "Text editor",

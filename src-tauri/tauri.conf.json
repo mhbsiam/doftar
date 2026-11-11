@@ -53,6 +53,13 @@
           "$HOME/**/*.[mM][44][vV]",
           "$HOME/**/*.[mM][oO][vV]",
           "$HOME/**/*.[wW][eE][bB][mM]",
+          "$HOME/**/*.[mM][pP]3",
+          "$HOME/**/*.[mM]4[aA]",
+          "$HOME/**/*.[aA][aA][cC]",
+          "$HOME/**/*.[wW][aA][vV]",
+          "$HOME/**/*.[fF][lL][aA][cC]",
+          "$HOME/**/*.[aA][iI][fF]",
+          "$HOME/**/*.[aA][iI][fF][fF]",
           "/Volumes/**/*.[pP][nN][gG]",
           "/Volumes/**/*.[jJ][pP][gG]",
           "/Volumes/**/*.[jJ][pP][eE][gG]",
@@ -69,7 +76,14 @@
           "/Volumes/**/*.[mM][pP][44]",
           "/Volumes/**/*.[mM][44][vV]",
           "/Volumes/**/*.[mM][oO][vV]",
-          "/Volumes/**/*.[wW][eE][bB][mM]"
+          "/Volumes/**/*.[wW][eE][bB][mM]",
+          "/Volumes/**/*.[mM][pP]3",
+          "/Volumes/**/*.[mM]4[aA]",
+          "/Volumes/**/*.[aA][aA][cC]",
+          "/Volumes/**/*.[wW][aA][vV]",
+          "/Volumes/**/*.[fF][lL][aA][cC]",
+          "/Volumes/**/*.[aA][iI][fF]",
+          "/Volumes/**/*.[aA][iI][fF][fF]"
         ]
       }
     }
