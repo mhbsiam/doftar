@@ -30,7 +30,7 @@ pulldown-cmark = { version = "0.13.6", default-features = false }
 # Local reads only. Without default features libgit2 has no HTTPS or SSH transport.
 git2 = { version = "0.21", default-features = false }
 sha2 = "0.10"
-sha1 = "0.10"
+sha1 = "0.11"
 md-5 = "0.10"
 csv = "1"
 parquet = { version = "60", default-features = false, features = ["snap", "zstd", "lz4", "flate2-zlib-rs", "brotli"] }
