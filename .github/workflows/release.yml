@@ -80,7 +80,7 @@ jobs:
           # The tag is created on publish. Pin it to the built commit.
           releaseCommitish: ${{ github.sha }}
           releaseBody: |
-            Doftar is a free, offline file manager for macOS. It runs on Apple silicon Macs with macOS 27 or later. What's new: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/v__VERSION__/CHANGELOG.md).
+            Doftar is a free, offline file manager for macOS. It runs on Apple silicon Macs and is tested on macOS 27. What's new: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/v__VERSION__/CHANGELOG.md).
 
             ## Install
 

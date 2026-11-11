@@ -18,7 +18,7 @@
 
 Doftar is a Mac file manager that opens your data. Parquet, AnnData, SQLite,
 notebooks, PDFs and code open in built-in viewers, next to the folders they
-live in. It runs on Apple silicon Macs with macOS 27 or later and needs nothing
+live in. It runs on Apple silicon Macs, is tested on macOS 27 and needs nothing
 else installed.
 
 ## Why Doftar
