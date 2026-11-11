@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/mhbsiam/doftar/releases/latest">Download</a> &middot;
-  <a href="https://mhbsiam.github.io/doftar/">Website</a> &middot;
+  <a href="https://doftar.app/">Website</a> &middot;
   <a href="docs/REFERENCE.md">Full feature list</a>
 </p>
 
