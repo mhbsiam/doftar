@@ -47,13 +47,13 @@
     "@tauri-apps/plugin-opener": "^2.2.6",
     "lowlight": "^3.3.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.3.1",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.6.0",
     "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/browser-playwright": "5.0.5",
     "eslint": "^10.14.0",
