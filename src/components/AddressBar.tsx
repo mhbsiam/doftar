@@ -729,6 +729,7 @@ export function AddressBar() {
       </div>
       <div
         className={`searchbox${canDeepSearch && search.trim() ? " has-query" : ""}${canDeepSearch ? "" : " off"}`}
+        title={canDeepSearch ? undefined : "Search works inside a folder"}
       >
         <SearchRegular />
         <input
@@ -737,7 +738,6 @@ export function AddressBar() {
           aria-label={canDeepSearch ? `Search ${title}` : "Search (open a folder to search)"}
           placeholder={canDeepSearch ? `Search ${title}` : "Open a folder to search"}
           disabled={!canDeepSearch}
-          title={canDeepSearch ? undefined : "Search works inside a folder"}
           value={canDeepSearch ? search : ""}
           onChange={(e) => useTabs.getState().setSearch(e.target.value)}
           onKeyDown={(e) => {

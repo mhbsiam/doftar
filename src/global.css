@@ -1317,8 +1317,11 @@ body .new-btn:active {
 .searchbox.off:hover {
   background: transparent;
 }
+/* WebKit lets a click select a disabled input's placeholder, which looks like a selection. */
 .searchbox.off input {
-  cursor: default;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .main {
