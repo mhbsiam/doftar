@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Social card for doftar.app (docs/assets/og.png). Render from the repo root with:
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --hide-scrollbars \
+       --force-device-scale-factor=1 --window-size=1200,630 \
+       --screenshot="$PWD/docs/assets/og.png" "file://$PWD/scripts/og-card.html" -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    display: flex; align-items: center; gap: 60px; box-sizing: border-box;
+    padding: 0 64px 10px 84px; background: #f4f6f6;
+    border-bottom: 10px solid #1f7f91;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+    color: #15191c;
+  }
+  img { flex: none; width: 270px; height: 270px; filter: drop-shadow(0 22px 34px rgb(11 34 64 / 0.22)); }
+  .name { margin: 0 0 12px; font-size: 30px; font-weight: 700; color: #0b2240; letter-spacing: -0.015em; }
+  h1 { margin: 0; font-size: 58px; line-height: 1.06; font-weight: 600; letter-spacing: -0.03em; color: #0b2240; }
+  h1 span { color: #1f7f91; }
+  p { margin: 22px 0 0; font-size: 25px; line-height: 1.4; color: #5a6468; letter-spacing: -0.005em; }
+  ul { display: flex; gap: 10px; margin: 26px 0 0; padding: 0; list-style: none; }
+  li { padding: 7px 16px; border-radius: 999px; background: #fff; border: 1px solid #dde3e4; font-size: 18px; font-weight: 600; color: #0b2240; }
+</style>
+</head>
+<body>
+  <img src="../docs/assets/doftar-icon.svg" alt="">
+  <div>
+    <div class="name">Doftar</div>
+    <h1>The file manager macOS<br><span>forgot to ship.</span></h1>
+    <p>Tabs, split view, disk usage, and built-in viewers<br>for documents, media, code and data.</p>
+    <ul><li>Free</li><li>Open source</li><li>No network</li></ul>
+  </div>
+</body>
+</html>
