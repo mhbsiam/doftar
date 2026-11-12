@@ -9,15 +9,19 @@ pub fn is_cloud(path: &str) -> bool {
 /// Downloads an online-only cloud file. Reading the file makes its drive download all of it.
 #[tauri::command(async)]
 pub fn download_file(path: String) -> Result<(), String> {
+    download(std::path::Path::new(&path))
+}
+
+pub(crate) fn download(path: &std::path::Path) -> Result<(), String> {
     use std::io::Read;
-    let dataless = |p: &str| std::fs::metadata(p).is_ok_and(|m| crate::thumbs::is_dataless(&m));
-    if !dataless(&path) {
+    let dataless = |p: &std::path::Path| std::fs::metadata(p).is_ok_and(|m| crate::thumbs::is_dataless(&m));
+    if !dataless(path) {
         return Ok(());
     }
-    std::fs::File::open(&path)
+    std::fs::File::open(path)
         .and_then(|mut f| f.read(&mut [0u8; 1]))
         .map_err(|e| format!("Couldn't download it: {e}"))?;
-    if dataless(&path) {
+    if dataless(path) {
         return Err("Couldn't download it: the drive didn't send it".into());
     }
     Ok(())

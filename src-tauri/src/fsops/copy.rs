@@ -2,13 +2,45 @@
 
 use super::*;
 
-#[cfg(target_os = "macos")]
 pub(super) fn copy_item(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
+    download_cloud_files(from, job)?;
+    copy_downloaded(from, to, job)
+}
+
+#[cfg(target_os = "macos")]
+fn copy_downloaded(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
     macos_copy::copy(from, to, job, true)?;
     // A copy on one volume is a clone of the same blocks. Reading both sides would prove nothing.
     if job.verifies() && !on_same_volume(from, to.parent().unwrap_or(to)) {
         verify_tree(from, to, job)?;
     }
+    Ok(())
+}
+
+/// Downloads the online-only cloud files under `p`. copyfile does not make the drive download them.
+/// Walks every tree: iCloud Desktop & Documents files are online-only outside the cloud folders.
+#[cfg(target_os = "macos")]
+fn download_cloud_files(p: &Path, job: &Job) -> std::io::Result<()> {
+    job.wait_while_paused();
+    if job.cancelled() {
+        return Err(std::io::ErrorKind::Interrupted.into());
+    }
+    let meta = fs::symlink_metadata(p)?;
+    if meta.is_dir() {
+        for item in fs::read_dir(p)? {
+            download_cloud_files(&item?.path(), job)?;
+        }
+    } else if crate::thumbs::is_dataless(&meta) {
+        job.set_current(&format!("Downloading {}", label(p)));
+        // shortcut: the read blocks until the whole file arrives, so Cancel waits for it; File Provider APIs could interrupt it.
+        crate::downloads::download(p)
+            .map_err(|e| std::io::Error::other(format!("\"{}\": {e}", label(p))))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn download_cloud_files(_p: &Path, _job: &Job) -> std::io::Result<()> {
     Ok(())
 }
 
@@ -91,8 +123,10 @@ pub(super) fn tree_revision(p: &Path) -> std::io::Result<Vec<(PathBuf, String)>>
 /// Copies for a move. Checks that the copy has every item and byte, and that the original did not change.
 /// Returns the `tree_revision` of the original, to check again before deleting it.
 pub(super) fn copy_verified(from: &Path, to: &Path, job: &Job) -> std::io::Result<Vec<(PathBuf, String)>> {
+    // Download first: a download could change the revision and fail the move.
+    download_cloud_files(from, job)?;
     let before = tree_revision(from)?;
-    copy_item(from, to, job)?;
+    copy_downloaded(from, to, job)?;
     if tree_revision(from)? != before {
         return Err(std::io::Error::other(
             "the original changed while it was being copied, so it was kept",
@@ -255,7 +289,7 @@ pub(super) mod macos_copy {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub(super) fn copy_item(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
+fn copy_downloaded(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
     use std::io::{Read, Write};
 
     if job.cancelled() {
@@ -269,7 +303,7 @@ pub(super) fn copy_item(from: &Path, to: &Path, job: &Job) -> std::io::Result<()
         fs::create_dir(to)?;
         for item in fs::read_dir(from)? {
             let item = item?;
-            copy_item(&item.path(), &to.join(item.file_name()), job)?;
+            copy_downloaded(&item.path(), &to.join(item.file_name()), job)?;
         }
     } else if meta.file_type().is_symlink() {
         std::os::unix::fs::symlink(fs::read_link(from)?, to)?;
