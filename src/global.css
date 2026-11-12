@@ -1572,6 +1572,45 @@ body .new-btn:active {
   display: flex;
   border-left: 1px solid var(--border);
 }
+/* The two-finger swipe cue. `--swipe` on .content-frame runs from 0 to 1 as the swipe nears a step. */
+.swipe-cue {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  display: none;
+  place-items: center;
+  width: 2.857rem;
+  height: 2.857rem;
+  margin-top: -1.429rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 1.429rem;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  opacity: var(--swipe, 0);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.content-frame[data-swipe] .swipe-cue {
+  display: grid;
+}
+.content-frame[data-swipe="back"] .swipe-cue {
+  left: 1rem;
+  transform: translateX(calc((var(--swipe, 0) - 1) * 1rem)) scale(calc(0.6 + 0.4 * var(--swipe, 0)));
+}
+.content-frame[data-swipe="forward"] .swipe-cue {
+  right: 1rem;
+  transform: translateX(calc((1 - var(--swipe, 0)) * 1rem)) scale(calc(0.6 + 0.4 * var(--swipe, 0)));
+}
+.content-frame[data-swipe="back"] .swipe-forward,
+.content-frame[data-swipe="forward"] .swipe-back {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .content-frame[data-swipe] .swipe-cue {
+    transform: none;
+  }
+}
 .content {
   flex: 1;
   min-width: 0;

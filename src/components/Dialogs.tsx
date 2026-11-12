@@ -888,6 +888,7 @@ type Toggle =
   | "searchContents"
   | "columnStats"
   | "verifyCopies"
+  | "swipeNavigation"
   | "externalThumbnails";
 
 function Check({ k, label, note }: { k: Toggle; label: string; note?: string }) {
@@ -1008,6 +1009,7 @@ function SettingsDialog() {
           <Check k="gridItemInfo" label="Show each file's size in Icons view" />
           <Check k="searchContents" label="Search inside files, not only names" />
           <Check k="columnStats" label="Show min, max and missing counts in data tables" />
+          <Check k="swipeNavigation" label="Swipe with two fingers to go back and forward" />
           <Check
             k="verifyCopies"
             label="Verify copies and moves to other drives"

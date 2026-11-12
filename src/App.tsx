@@ -2,6 +2,7 @@ import { FolderTreeSlot } from "./components/FolderTree";
 import { PreviewSlot } from "./components/PreviewPane";
 import { useEffect, useLayoutEffect, useRef, type SyntheticEvent } from "react";
 import { FluentProvider } from "@fluentui/react-components";
+import { ArrowLeftRegular, ArrowRightRegular } from "@fluentui/react-icons";
 import { fluentTheme } from "./fluentTheme";
 import { accentFor } from "./util/accent";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -77,6 +78,11 @@ function PaneBody({ pane }: { pane: number }) {
           aria-labelledby={`wf-tab-title-${activeTabId}`}
         >
           <ContentArea />
+          {/* useShortcuts shows it during a two-finger swipe. */}
+          <div className="swipe-cue" aria-hidden="true">
+            <ArrowLeftRegular className="swipe-back" />
+            <ArrowRightRegular className="swipe-forward" />
+          </div>
         </main>
         <PaneBoundary what="the side panel">
           <FolderTreeSlot pane={pane} />

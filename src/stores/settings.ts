@@ -63,6 +63,8 @@ interface SettingsStore {
   showCheckboxes: boolean;
   /** Read both sides after a copy or move to another drive and compare checksums. About twice as slow. */
   verifyCopies: boolean;
+  /** A sideways two-finger swipe over the files goes Back and Forward. */
+  swipeNavigation: boolean;
   /** Icons view shows each file's size under its name. */
   gridItemInfo: boolean;
   filter: ContentFilter;
@@ -127,6 +129,7 @@ export const useSettings = create<SettingsStore>()(
       savedSearches: [],
       showCheckboxes: true,
       verifyCopies: false,
+      swipeNavigation: true,
       gridItemInfo: false,
       previewWidth: DEFAULT_PREVIEW_REM,
       previewInfoHeight: 0,

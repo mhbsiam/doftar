@@ -16,6 +16,43 @@ afterEach(() => {
   usePanes.setState({ split: false, focused: 0 });
 });
 
+test("a two-finger swipe shows an arrow that grows, then goes back; the setting turns it off", async () => {
+  ({ unmount } = await mount(<App />, 1200));
+  paneStore(0).getState().navigate({ kind: "path", path: "/Users/me" });
+  await settle(500);
+  const frame = document.querySelector<HTMLElement>('.pane[data-pane="0"] .content-frame')!;
+  const swipe = (dx: number) =>
+    frame.querySelector(".content")!.dispatchEvent(new WheelEvent("wheel", { deltaX: dx, bubbles: true }));
+  const cue = () => getComputedStyle(frame.querySelector(".swipe-cue")!);
+  const location = () => {
+    const s = paneStore(0).getState();
+    return s.tabs.find((t) => t.id === s.activeId)!.location.kind;
+  };
+
+  // Forward has nowhere to go, so no arrow.
+  swipe(60);
+  expect(Number(frame.style.getPropertyValue("--swipe"))).toBe(0);
+  await settle(300);
+
+  swipe(-90);
+  expect(frame.dataset.swipe).toBe("back");
+  expect(cue().display).toBe("grid");
+  expect(Number(frame.style.getPropertyValue("--swipe"))).toBeCloseTo(0.5, 2);
+  expect(location()).toBe("path");
+  swipe(-90);
+  await settle(500);
+  expect(location()).toBe("home");
+  expect(Number(frame.style.getPropertyValue("--swipe"))).toBe(0);
+
+  paneStore(0).getState().go(1);
+  await settle(500);
+  useSettings.getState().set({ swipeNavigation: false });
+  swipe(-200);
+  await settle(500);
+  expect(location()).toBe("path");
+  useSettings.getState().set({ swipeNavigation: true });
+});
+
 test("in split view both halves lay out alike, one preview hides the right navigation pane, and the listings share the width", async () => {
   usePanes.setState({ split: true, focused: 0 });
   ({ unmount } = await mount(<App />, 1200));

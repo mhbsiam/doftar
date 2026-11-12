@@ -246,18 +246,40 @@ export function useShortcuts() {
     };
     // A sideways two-finger swipe over the file area goes Back and Forward in that pane, as in Finder.
     let swipePane = 0;
-    const swipes = swipeTracker((dir) => {
-      focusPane(swipePane);
-      paneStore(swipePane).getState().go(dir);
-    });
+    let swipeFrame: HTMLElement | null = null;
+    const canGo = (pane: number, dir: number) => {
+      const s = paneStore(pane).getState();
+      const tab = s.tabs.find((t) => t.id === s.activeId);
+      const i = (tab?.historyIndex ?? 0) + dir;
+      return !!tab && i >= 0 && i < tab.history.length;
+    };
+    // An arrow grows at the edge the swipe goes to, so the user sees it coming and can swipe back to stop.
+    const showSwipe = (p: number) => {
+      if (!swipeFrame) return;
+      const dir = p < 0 ? -1 : 1;
+      const on = p !== 0 && canGo(swipePane, dir);
+      if (on) swipeFrame.dataset.swipe = dir < 0 ? "back" : "forward";
+      swipeFrame.style.setProperty("--swipe", on ? Math.abs(p).toFixed(3) : "0");
+    };
+    const swipes = swipeTracker(
+      (dir) => {
+        focusPane(swipePane);
+        paneStore(swipePane).getState().go(dir);
+      },
+      { distance: 180, onProgress: showSwipe }
+    );
     const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY) || activeModal()) return;
-      const frame = e.target instanceof Element ? e.target.closest(".content-frame") : null;
+      // A mostly sideways move only: a diagonal scroll down a list is not a swipe.
+      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) <= 2 * Math.abs(e.deltaY) || activeModal()) return;
+      if (!useSettings.getState().swipeNavigation) return;
+      const frame = e.target instanceof Element ? e.target.closest<HTMLElement>(".content-frame") : null;
       if (!frame) return;
       // A list that scrolls sideways (columns, a wide table) keeps the swipe for itself.
       for (let el = e.target as Element | null; el && el !== frame.parentElement; el = el.parentElement) {
         if (el.scrollWidth > el.clientWidth && /auto|scroll/.test(getComputedStyle(el).overflowX)) return;
       }
+      if (swipeFrame !== frame) swipeFrame?.style.setProperty("--swipe", "0");
+      swipeFrame = frame;
       swipePane = paneAt(e.clientX, e.clientY);
       swipes.feed(e.deltaX);
     };
