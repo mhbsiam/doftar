@@ -1,7 +1,7 @@
 {
   "name": "doftar",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.",
   "license": "Apache-2.0",
   "author": "Hasanul Banna Siam",
