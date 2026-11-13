@@ -476,10 +476,16 @@
   </div>
 </section>
 
-<section class="block">
-  <h2>Built to keep your files safe</h2>
-  <p>Scripts and installers ask before they run. Files unzipped from a download are still checked by Gatekeeper. System and home folders can't be moved or deleted. And Doftar has no networking code. A sandbox blocks its main process from the network, and its built-in previews can't load anything from the web.</p>
-  <p class="more"><a href="https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md">Read how Doftar handles security</a></p>
+<section class="block" id="faq">
+  <h2>Before you download</h2>
+  <div class="faq">
+    <details><summary>Is it safe?</summary><p>Doftar has no networking code, and a sandbox blocks its main process from the network. Scripts and installers ask before they run, and system folders can't be moved or deleted. The code is public, so anyone can check. <a href="https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md">How Doftar handles security</a></p></details>
+    <details><summary>Why does macOS warn me when I open it?</summary><p>Doftar isn't notarized yet. That needs a paid Apple Developer membership, which this free project doesn't have. You allow it once in System Settings, as the steps below show.</p></details>
+    <details><summary>Is it really free?</summary><p>Yes. It's open source under Apache 2.0, with no account, ads or tracking.</p></details>
+    <details><summary>Does it replace Finder?</summary><p>No. It runs next to Finder, and you can drag files between the two.</p></details>
+    <details><summary>Which Macs does it run on?</summary><p>Apple silicon Macs (M1 and later) on macOS 13.1 Ventura or later. There is no Intel build.</p></details>
+    <details><summary>How do I update it?</summary><p>Doftar never goes online, so it doesn't check for updates. Download the new release and drag it onto the old one in Applications. Your settings stay.</p></details>
+  </div>
 </section>
 
 <section class="band" id="install">
@@ -562,6 +568,10 @@
     <span>·</span> <a href="https://github.com/mhbsiam/doftar">GitHub</a>
     <span>·</span> <a href="https://github.com/mhbsiam/doftar/blob/main/TERMS.md">Terms</a>
     <span>·</span> <a href="https://github.com/mhbsiam/doftar/blob/main/LICENSE">Apache 2.0</a>
+  </p>
+  <p>For Apple silicon Macs, macOS 13.1 and later
+    <span>·</span> <a href="changelog.html">What's new</a>
+    <span>·</span> <a href="https://github.com/mhbsiam/doftar/issues/new/choose">Report a bug</a>
   </p>
   <p class="legal">Doftar is a file manager that copies, moves, overwrites and deletes files, so keep backups.</p>
   <p class="legal"><i>macOS</i> and <i>Finder</i> are trademarks of Apple Inc.; <i>Windows</i> and <i>Explorer</i> are trademarks of Microsoft Corporation. Doftar is an independent project, not affiliated with or endorsed by either.</p>
