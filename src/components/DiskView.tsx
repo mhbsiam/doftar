@@ -22,9 +22,10 @@ import { useTabs, usePaneStore, parentOf } from "../stores/tabs";
 import { useSystemInfo } from "../hooks/useSystemInfo";
 import { api } from "../ipc";
 import { confirmedIds, copyText, deleteNow, navigateTo, setViewEntries, showError, trashNow } from "../actions";
-import { formatDate, formatSize } from "../util/format";
+import { basename, formatDate, formatSize } from "../util/format";
 import { diskCsv } from "../util/diskCsv";
-import type { DevFolder, DiskCategory, DiskFile, DiskReport, FileEntry, ScanProgress } from "../types";
+import { WORKTREE_LABEL } from "../types";
+import type { DevFolder, DiskCategory, DiskFile, DiskReport, FileEntry, GitWorktreeStatus, ScanProgress } from "../types";
 
 const CATEGORY_LABEL: Record<DiskCategory, string> = {
   apps: "Apps",
@@ -254,6 +255,112 @@ function DevFolders({ items, onTrash }: { items: DevFolder[]; onTrash: (path: st
   );
 }
 
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+/** What trashing the worktree folder would lose, or null if nothing. */
+function worktreeRisk(s: GitWorktreeStatus): string | null {
+  const lost = [
+    s.changes > 0 && plural(s.changes, "uncommitted change"),
+    s.detached && s.unique > 0 && `${plural(s.unique, "commit")} on no branch`,
+  ].filter(Boolean);
+  return lost.length > 0 ? lost.join(" and ") : null;
+}
+
+function worktreeNote(s: GitWorktreeStatus | null | undefined): string {
+  if (s === undefined) return "Checking…";
+  if (s === null) return "Not a worktree any more";
+  if (s.locked) return "Locked by the tool that made it";
+  const risk = worktreeRisk(s);
+  if (risk) return risk[0].toUpperCase() + risk.slice(1);
+  if (s.unique > 0) return `${plural(s.unique, "commit")} only on ${s.branch}`;
+  return "Finished";
+}
+
+function Worktrees({ items, onTrash }: { items: DevFolder[]; onTrash: (path: string) => void }) {
+  const total = items.reduce((n, j) => n + j.bytes, 0);
+  const [open, title] = useCollapsible("Git worktrees");
+  const [status, setStatus] = useState<Record<string, GitWorktreeStatus | null>>({});
+  const key = items.map((j) => j.path).join("\n");
+  // git status reads every file of a worktree, so it runs only while the card is open.
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    setStatus({});
+    for (const j of items) {
+      void api
+        .gitWorktreeStatus(j.path)
+        .catch(() => null)
+        .then((s) => live && setStatus((m) => ({ ...m, [j.path]: s })));
+    }
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, key]);
+
+  const trash = async (j: DevFolder) => {
+    // The status shown can be old: an agent may have worked in the worktree since the card opened.
+    const s = await api.gitWorktreeStatus(j.path).catch(() => null);
+    setStatus((m) => ({ ...m, [j.path]: s }));
+    if (!s || s.locked) return;
+    const risk = worktreeRisk(s);
+    if (!risk) return onTrash(j.path);
+    const prune = s.detached && s.unique > 0 ? " Put it back before running git worktree prune, or the commits can be lost." : "";
+    useUI.getState().openConfirm({
+      title: "Move this worktree to the Trash?",
+      message: `"${basename(j.path)}" has ${risk}. They go to the Trash with the folder.${prune}`,
+      confirmLabel: "Move to Trash",
+      danger: true,
+      onConfirm: () => onTrash(j.path),
+    });
+  };
+
+  return (
+    <section className="disk-card disk-files" aria-label="Git worktrees">
+      <div className="disk-files-head">
+        {title}
+        <span className="disk-file-date">{formatSize(total)}</span>
+      </div>
+      {open && (
+        <ul className="disk-filelist">
+          {items.map((j) => {
+            const s = status[j.path];
+            return (
+              <li key={j.path} className="disk-file disk-dev" onDoubleClick={() => useTabs.getState().reveal(j.path)}>
+                <span className="disk-file-text" title={j.path}>
+                  <span className="disk-file-name">
+                    {s ? `${s.repo} · ${s.branch}` : basename(j.path)}
+                  </span>
+                  <span className="disk-file-path">{j.path}</span>
+                </span>
+                <span className={`disk-file-date${s && (s.locked || worktreeRisk(s)) ? " disk-wt-warn" : ""}`}>
+                  {worktreeNote(s)}
+                </span>
+                <span className="disk-file-size">{formatSize(j.bytes)}</span>
+                <span className="disk-dev-actions">
+                  <button className="btn subtle compact" onClick={() => useTabs.getState().reveal(j.path)}>
+                    <FolderOpenRegular className="btn-icon" />
+                    Show
+                  </button>
+                  <button
+                    className="btn subtle compact"
+                    disabled={!s || s.locked}
+                    title={s?.locked ? "Unlock it with git worktree unlock first" : undefined}
+                    onClick={() => void trash(j)}
+                  >
+                    <DeleteRegular className="btn-icon" />
+                    Move to Trash
+                  </button>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export function DiskView() {
   useDateFormat();
   const { report, scanning, progress, error } = useDisk();
@@ -364,6 +471,9 @@ export function DiskView() {
         setMapVersion((v) => v + 1);
       });
   };
+
+  const devFolders = report?.devFolders?.filter((j) => j.label !== WORKTREE_LABEL) ?? [];
+  const worktrees = report?.devFolders?.filter((j) => j.label === WORKTREE_LABEL) ?? [];
 
   const settle = async (paths: string[]) => {
     const exists = await Promise.all(paths.map((p) => api.pathExists(p).catch(() => true)));
@@ -625,8 +735,12 @@ export function DiskView() {
         )}
       </section>
 
-      {report?.devFolders && report.devFolders.length > 0 && (
-        <DevFolders items={report.devFolders} onTrash={(p) => void trashNow([p]).then(() => settle([p]))} />
+      {devFolders.length > 0 && (
+        <DevFolders items={devFolders} onTrash={(p) => void trashNow([p]).then(() => settle([p]))} />
+      )}
+
+      {worktrees.length > 0 && (
+        <Worktrees items={worktrees} onTrash={(p) => void trashNow([p]).then(() => settle([p]))} />
       )}
 
       <DiskDuplicates title={dupesTitle} open={dupesOpen} />

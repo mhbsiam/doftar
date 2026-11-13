@@ -301,6 +301,66 @@ pub async fn git_overview(path: String) -> Result<Option<Overview>, String> {
     jobs::blocking(move || overview(Path::new(&path))).await
 }
 
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeStatus {
+    /// Folder name of the main worktree.
+    repo: String,
+    /// The short commit id when HEAD is detached.
+    branch: String,
+    detached: bool,
+    /// Ignored items are not counted. An untracked folder counts once.
+    changes: usize,
+    /// Commits that no other branch or remote branch has. Capped at `UNIQUE_LIMIT`.
+    unique: usize,
+    locked: bool,
+}
+
+const UNIQUE_LIMIT: usize = 1000;
+
+/// None if `dir` is not a linked worktree.
+pub fn worktree_status(dir: &Path) -> Option<WorktreeStatus> {
+    let repo = Repository::open(dir).ok()?;
+    if !repo.is_worktree() {
+        return None;
+    }
+    let common = repo.commondir().canonicalize().ok()?;
+    let repo_name = common.parent()?.file_name()?.to_string_lossy().into_owned();
+    let locked = git2::Worktree::open_from_repository(&repo)
+        .ok()
+        .and_then(|w| w.is_locked().ok())
+        .is_some_and(|l| !matches!(l, git2::WorktreeLockStatus::Unlocked));
+
+    let mut opts = StatusOptions::new();
+    opts.include_untracked(true).recurse_untracked_dirs(false).include_ignored(false).exclude_submodules(true);
+    let changes = repo.statuses(Some(&mut opts)).ok()?.len();
+
+    let (branch, detached, ..) = branch_of(&repo);
+    let unique = (|| {
+        let head = repo.head().ok()?;
+        let own = head.name().ok().map(str::to_string);
+        let mut walk = repo.revwalk().ok()?;
+        walk.push(head.target()?).ok()?;
+        for r in repo.references().ok()?.flatten() {
+            let Ok(name) = r.name() else { continue };
+            let other = name.starts_with("refs/remotes/") || name.starts_with("refs/heads/");
+            if other && Some(name) != own.as_deref() {
+                if let Ok(c) = r.peel_to_commit() {
+                    let _ = walk.hide(c.id());
+                }
+            }
+        }
+        Some(walk.take(UNIQUE_LIMIT).count())
+    })()
+    .unwrap_or(0);
+    Some(WorktreeStatus { repo: repo_name, branch, detached, changes, unique, locked })
+}
+
+#[tauri::command]
+pub async fn git_worktree_status(path: String) -> Result<Option<WorktreeStatus>, String> {
+    jobs::blocking(move || worktree_status(Path::new(&path))).await
+}
+
 /// Check out local branch `name`. Refuse if uncommitted edits would be overwritten.
 pub fn switch(dir: &Path, name: &str) -> Result<(), String> {
     let repo = Repository::discover(dir).map_err(|e| e.message().to_string())?;
@@ -548,6 +608,33 @@ mod tests {
         assert_eq!(fs::read_to_string(main_dir.join("a.txt")).unwrap(), "1");
         assert_eq!(info(&main_dir).unwrap().branch, "feature");
         assert!(switch(&main_dir, "nope").is_err());
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn worktree_status_counts_changes_and_unique_commits() {
+        let (base, repo) = temp_repo("wts");
+        fs::write(base.join("a.txt"), "1").unwrap();
+        commit_all(&repo, "init");
+        let wt_dir = base.with_file_name(format!("{}-wt", base.file_name().unwrap().to_string_lossy()));
+        let _ = fs::remove_dir_all(&wt_dir);
+        repo.worktree("feat", &wt_dir, None).unwrap();
+        assert!(worktree_status(&base).is_none(), "the main worktree is not a linked one");
+
+        let s = worktree_status(&wt_dir).unwrap();
+        assert_eq!((s.branch.as_str(), s.changes, s.unique, s.locked), ("feat", 0, 0, false));
+        assert_eq!(s.repo, base.file_name().unwrap().to_string_lossy());
+
+        let wt = Repository::open(&wt_dir).unwrap();
+        fs::write(wt_dir.join("b.txt"), "2").unwrap();
+        commit_all(&wt, "work");
+        fs::write(wt_dir.join("c.txt"), "3").unwrap();
+        let s = worktree_status(&wt_dir).unwrap();
+        assert_eq!((s.changes, s.unique), (1, 1), "an untracked file and a commit only feat has");
+
+        repo.find_worktree("feat").unwrap().lock(None).unwrap();
+        assert!(worktree_status(&wt_dir).unwrap().locked);
+        fs::remove_dir_all(&wt_dir).unwrap();
         fs::remove_dir_all(&base).unwrap();
     }
 

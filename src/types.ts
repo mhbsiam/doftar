@@ -53,6 +53,18 @@ export interface GitWorktree {
   current: boolean;
 }
 
+export interface GitWorktreeStatus {
+  /** Folder name of the main worktree. */
+  repo: string;
+  /** The short commit id when HEAD is detached. */
+  branch: string;
+  detached: boolean;
+  changes: number;
+  /** Commits no other branch or remote branch has. */
+  unique: number;
+  locked: boolean;
+}
+
 export interface GitCommit {
   id: string;
   summary: string;
@@ -375,6 +387,9 @@ export interface DiskReport {
   /** Absent in reports saved before the scan looked for it. */
   devFolders?: DevFolder[];
 }
+
+/** `DevFolder.label` of a linked git worktree. */
+export const WORKTREE_LABEL = "Git worktree";
 
 export interface DevFolder {
   path: string;

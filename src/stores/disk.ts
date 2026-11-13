@@ -81,7 +81,10 @@ export const useDisk = create<DiskStore>((set, get) => ({
     // Count each byte once: a measured item, a developer folder, or another file.
     const pieces = [
       ...sized,
-      ...goneDevFolders.filter((j) => !counted(j.path)).map((j) => ({ path: j.path, bytes: j.bytes })),
+      ...goneDevFolders
+        // A worktree can hold a developer folder of its own.
+        .filter((j) => !counted(j.path) && !goneDevFolders.some((o) => o !== j && within(j.path, o.path)))
+        .map((j) => ({ path: j.path, bytes: j.bytes })),
       ...removed
         .filter((f) => !counted(f.path) && !goneDevFolders.some((j) => f.path.startsWith(j.path + "/")))
         .map((f) => ({ path: f.path, bytes: f.size })),

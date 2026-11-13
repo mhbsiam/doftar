@@ -4328,8 +4328,12 @@ body .fui-Tooltip {
 }
 .disk-dev-actions {
   display: flex;
+  align-items: center;
   gap: 0.286rem;
   justify-content: flex-end;
+}
+.disk-file-date.disk-wt-warn {
+  color: var(--danger);
 }
 .disk-file:hover {
   background: var(--bg-hover);

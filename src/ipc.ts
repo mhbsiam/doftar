@@ -15,6 +15,7 @@ import type {
   FileEntry,
   GitInfo,
   GitOverview,
+  GitWorktreeStatus,
   GitRepo,
   SkillPlace,
   OpResult,
@@ -264,6 +265,7 @@ export const api = {
   gitInfo: (path: string) => invoke<GitInfo | null>("git_info", { path }),
   gitOverview: (path: string) => invoke<GitOverview | null>("git_overview", { path }),
   gitSwitch: (path: string, branch: string) => invoke<void>("git_switch", { path, branch }),
+  gitWorktreeStatus: (path: string) => invoke<GitWorktreeStatus | null>("git_worktree_status", { path }),
   gitRepos: () => invoke<GitRepo[]>("git_repos"),
   listSkills: () => invoke<SkillPlace[]>("list_skills"),
   /** Resolves the path of the new SKILL.md. */

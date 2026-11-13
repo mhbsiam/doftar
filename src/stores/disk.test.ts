@@ -46,4 +46,15 @@ describe("removeFiles", () => {
     expect(r.folders.find((f) => f.path === "/r/b")!.bytes).toBe(100);
     expect(r.folders.find((f) => f.path === "/r")!.bytes).toBe(100);
   });
+
+  it("counts a developer folder inside a trashed worktree once", () => {
+    const dev = (path: string, label: string, bytes: number) => ({ path, label, bytes, safe: true, note: "" });
+    useDisk.setState({
+      report: { ...report(), devFolders: [dev("/r/a/wt", "Git worktree", 500), dev("/r/a/wt/node_modules", "Node packages", 400)] },
+    });
+    useDisk.getState().removeFiles(["/r/a/wt"]);
+    const r = useDisk.getState().report!;
+    expect(r.totalBytes).toBe(500);
+    expect(r.devFolders).toEqual([]);
+  });
 });

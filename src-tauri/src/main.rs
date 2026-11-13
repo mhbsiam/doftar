@@ -204,6 +204,7 @@ fn main() {
             git::git_info,
             git::git_overview,
             git::git_switch,
+            git::git_worktree_status,
             git::git_repos,
             skills::list_skills,
             skills::create_skill,

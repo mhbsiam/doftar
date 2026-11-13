@@ -78,7 +78,7 @@ pub struct DevFolder {
 }
 
 /// (label, safe to trash, note)
-const DEV_FOLDERS: [(&str, bool, &str); 18] = [
+const DEV_FOLDERS: [(&str, bool, &str); 19] = [
     ("Node packages", true, "npm install brings it back"),
     ("Python venv", true, "uv sync or pip install brings it back"),
     ("pixi environment", true, "pixi install brings it back"),
@@ -97,11 +97,22 @@ const DEV_FOLDERS: [(&str, bool, &str); 18] = [
     ("DaVinci Resolve cache", true, "Resolve renders its cache again as it is needed"),
     ("After Effects disk cache", true, "After Effects renders previews again"),
     ("Final Cut render files", true, "Final Cut renders again when the library is opened"),
+    ("Git worktree", false, "Its branch and commits stay in the repository"),
 ];
 const DEV_FOLDER_MIN: u64 = 1 << 20;
 const DEV_FOLDER_MAX: usize = 100;
 
 const CONDA_ENV: usize = 3;
+const WORKTREE: usize = 18;
+
+/// A linked worktree's `.git` is a file that points into the main repository's `.git/worktrees`.
+/// Submodules also have a `.git` file, but it points into `modules`, also inside a worktree's own `.git/worktrees/x`.
+fn is_worktree_link(m: &fs::Metadata, path: &Path) -> bool {
+    m.len() < 4096
+        && fs::read_to_string(path).is_ok_and(|s| {
+            s.starts_with("gitdir:") && s.contains("/worktrees/") && !s.contains("/modules/")
+        })
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum DevFolderScope {
@@ -359,6 +370,9 @@ impl<'a> Scan<'a> {
                         stack.push((path, app, scope, node));
                     }
                 } else {
+                    if !in_app && at != 0 && item.file_name() == ".git" && is_worktree_link(&m, &path) {
+                        self.dev_folders.push((dir.to_string_lossy().into_owned(), WORKTREE));
+                    }
                     self.add_file(&m, &path, in_app, at);
                 }
             }
@@ -686,7 +700,12 @@ fn scan(
         })
         .collect();
     dev_folders.sort_by_key(|j| Reverse(j.bytes));
-    dev_folders.truncate(DEV_FOLDER_MAX);
+    // Worktrees have their own list, so many node_modules cannot push them out.
+    let mut kept = 0;
+    dev_folders.retain(|j| {
+        kept += usize::from(j.label != DEV_FOLDERS[WORKTREE].0);
+        j.label == DEV_FOLDERS[WORKTREE].0 || kept <= DEV_FOLDER_MAX
+    });
 
     let report = DiskReport {
         root: root.to_string_lossy().into_owned(),
@@ -803,6 +822,13 @@ mod tests {
         big(".cache/huggingface/hub/models--x");
         big(".ollama/models/blobs");
         big("envs/not-conda");
+        big("repo/.claude/worktrees/feat/node_modules");
+        fs::write(base.join("repo/.claude/worktrees/feat/package.json"), "{}").unwrap();
+        fs::write(base.join("repo/.claude/worktrees/feat/.git"), "gitdir: /r/.git/worktrees/feat\n").unwrap();
+        big("repo/vendor/sub");
+        fs::write(base.join("repo/vendor/sub/.git"), "gitdir: ../../.git/modules/sub\n").unwrap();
+        big("repo/.claude/worktrees/feat/lib/sub");
+        fs::write(base.join("repo/.claude/worktrees/feat/lib/sub/.git"), "gitdir: /r/.git/worktrees/feat/modules/sub\n").unwrap();
         fs::create_dir_all(base.join("tiny/node_modules")).unwrap();
 
         let never = AtomicBool::new(false);
@@ -821,8 +847,10 @@ mod tests {
                 ("/app/node_modules", "Node packages", true),
                 ("/miniforge3/envs/old", "Conda environment", false),
                 ("/proj/.venv", "Python venv", true),
+                ("/repo/.claude/worktrees/feat", "Git worktree", false),
+                ("/repo/.claude/worktrees/feat/node_modules", "Node packages", true),
             ],
-            "nested, global and vendored node_modules, a plain envs folder and tiny folders are left out"
+            "nested, global and vendored node_modules, a plain envs folder, submodules and tiny folders are left out"
         );
         let nm = r.dev_folders.iter().find(|j| j.label == "Node packages").unwrap();
         assert!(nm.bytes >= 2 << 20, "the nested node_modules counts towards it");

@@ -42,6 +42,7 @@
     "allow-git-info",
     "allow-git-overview",
     "allow-git-switch",
+    "allow-git-worktree-status",
     "allow-git-repos",
     "allow-list-skills",
     "allow-create-skill",

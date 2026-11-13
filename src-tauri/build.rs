@@ -18,6 +18,7 @@ const COMMANDS: &[&str] = &[
     "git_info",
     "git_overview",
     "git_switch",
+    "git_worktree_status",
     "git_repos",
     "list_skills",
     "create_skill",
