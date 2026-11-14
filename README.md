@@ -51,35 +51,26 @@ else installed.
     <td align="center"><a href="docs/assets/install/3-done.png"><img src="docs/assets/install/3-done.png" height="140" alt="The &quot;Doftar&quot; Not Opened dialog, with Done highlighted" /></a><br /><sub>3 · Done</sub></td>
   </tr>
   <tr>
-    <td align="center"><a href="docs/assets/install/4-settings.png"><img src="docs/assets/install/4-settings.png" height="140" alt="System Settings, Privacy &amp; Security: the sidebar item and Open Anyway highlighted next to the message that Doftar was blocked" /></a><br /><sub>4 · Open Anyway</sub></td>
+    <td align="center"><a href="docs/assets/install/4-settings.png"><img src="docs/assets/install/4-settings.png" height="140" alt="System Settings, Privacy &amp; Security: the sidebar item and Open Anyway highlighted next to the message that Doftar was blocked" /></a><br /><sub>4 · Settings > Privacy & Security > Open Anyway</sub></td>
     <td align="center"><a href="docs/assets/install/5-open-anyway.png"><img src="docs/assets/install/5-open-anyway.png" height="140" alt="The Open &quot;Doftar&quot;? dialog, with Open Anyway highlighted" /></a><br /><sub>5 · Open Anyway</sub></td>
     <td align="center"><a href="docs/assets/install/6-password.png"><img src="docs/assets/install/6-password.png" height="140" alt="The Touch ID prompt to continue with Privacy &amp; Security, with Use Password highlighted" /></a><br /><sub>6 · Touch ID</sub></td>
   </tr>
 </table>
 
-### Prefer Terminal? 
-This route skips Gatekeeper's check, so please verify the
-download first. Put `SHA256SUMS` from the same release next to the DMG and run:
+### Prefer A Shortcut? 
+First, drag Doftar onto Applications, open terminal, and run the following code:
+
+```sh
+xattr -cr /Applications/Doftar.app
+```
+For safety and good practice, to avoid installing a damaged or altered package, please verify the
+download first. Find the `SHA256SUMS` file from the same Github release page, and run:
 
 ```sh
 shasum -a 256 -c SHA256SUMS
 # Optional, with the GitHub CLI: check the build provenance
 gh attestation verify doftar_v<version>_stable_macos.dmg --repo mhbsiam/doftar
 ```
-
-Then drag Doftar onto Applications and run this instead of steps 3 to 6:
-
-```sh
-xattr -cr /Applications/Doftar.app
-```
-
-**Updating:** download the new release and replace the app. **Check for
-updates** only opens the releases page in your browser.
-
-**Folder access:** the first time you browse Desktop, Documents, Downloads or
-an external drive, macOS asks for access. Click OK. If you denied it, allow
-Doftar in **System Settings → Privacy & Security → Files and Folders**.
-
 
 ## Features
 
@@ -204,6 +195,10 @@ the macOS Finder.
 *Doftar* (দফতর) is the Bengali word for an office. It comes from the Persian
 *daftar*, a register or ledger book where records were kept. A file manager is
 where your records are kept, so the name fit.
+
+## Acknowledgement
+
+Product design, aesthetics, and feature direction by me; code implementation assisted by AI models including Claude Fable 5.1/Opus 5.5, Devin SWE-2, and Codex GPT 6.1-Sol.
 
 ## Contributing
 
