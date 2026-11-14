@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { CommandBar } from "./CommandBar";
 import { mount, settle, SPLIT, WIDE } from "../test/mount";
 import { reply } from "../test/tauri";
@@ -33,6 +33,29 @@ test("command bar fits at every width from split to wide", async () => {
     if (bar.scrollWidth > bar.clientWidth) over.push(w);
   }
   expect(over).toEqual([]);
+});
+
+// In split view the pattern button is hidden. Arrow keys must step over it, not stop on it.
+test("arrow keys skip the hidden pattern button", async () => {
+  ({ unmount } = await mount(<CommandBar />, SPLIT));
+  page.getByRole("button", { name: "Filter" }).element().focus();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(document.activeElement?.getAttribute("aria-label")).toBe("Command palette");
+  await userEvent.keyboard("{ArrowLeft}");
+  expect(document.activeElement?.getAttribute("title")).toBe("Filter");
+});
+
+// The pattern button holds the Tab stop, then the bar narrows and hides it. Tab must still reach the bar.
+test("the tab stop leaves the pattern button when it hides", async () => {
+  let host: HTMLElement;
+  ({ host, unmount } = await mount(<CommandBar />, WIDE));
+  page.getByRole("button", { name: "Select by pattern" }).element().focus();
+  host.style.width = `${SPLIT}px`;
+  await settle(100);
+  const stops = [...document.querySelectorAll<HTMLButtonElement>(".commandbar button")].filter(
+    (b) => b.tabIndex === 0 && !b.disabled && b.getClientRects().length > 0
+  );
+  expect(stops).toHaveLength(1);
 });
 
 test("activity menu lists file actions and asks before undoing", async () => {

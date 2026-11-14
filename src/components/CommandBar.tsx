@@ -44,6 +44,7 @@ import {
   DeleteDismissRegular,
   DismissRegular,
   TagRegular,
+  TextAsteriskRegular,
 } from "@fluentui/react-icons";
 import { baseName, parentOf, toggleSplit, useActiveTab, usePanes, usePreviewOpen, useTabs } from "../stores/tabs";
 import { useUI } from "../stores/ui";
@@ -156,6 +157,21 @@ function PaletteButton() {
         onClick={() => useUI.getState().setPaletteOpen(true)}
       >
         <KeyCommandRegular />
+      </button>
+    </Tooltip>
+  );
+}
+
+function PatternButton() {
+  return (
+    <Tooltip content="Select by pattern (⇧⌘S)" relationship="label">
+      <button
+        className="cmd horizontal compact pattern-btn"
+        aria-label="Select by pattern"
+        aria-keyshortcuts="Meta+Shift+S"
+        onClick={() => useUI.getState().setSelectPatternOpen(true)}
+      >
+        <TextAsteriskRegular />
       </button>
     </Tooltip>
   );
@@ -767,6 +783,7 @@ export function CommandBar() {
         <ViewMenu />
         <FilterMenu />
         <CmdDivider />
+        <PatternButton />
         <PaletteButton />
         <ActivityButton inFolder={inFolder} />
         <PreviewToggle />

@@ -3,7 +3,8 @@ import { useEffect, useRef, type FocusEvent, type KeyboardEvent, type RefObject 
 /**
  * Roving tabindex for a group of buttons (ARIA toolbar or tree pattern).
  * The group is one Tab stop. Arrow keys, Home and End move between items.
- * The hook scans the items again when buttons appear, disappear or change their disabled state.
+ * The hook scans the items again when buttons appear, disappear or change their disabled state,
+ * and when the group changes size (CSS can hide items then).
  * This way Tab never lands on an item that cannot take focus.
  */
 export function useRovingFocus(
@@ -16,7 +17,8 @@ export function useRovingFocus(
   const items = () =>
     ref.current
       ? Array.from(ref.current.querySelectorAll<HTMLElement>(selector)).filter(
-          (el) => !(el as HTMLButtonElement).disabled
+          // A button hidden by CSS (display: none) cannot take focus.
+          (el) => !(el as HTMLButtonElement).disabled && el.getClientRects().length > 0
         )
       : [];
 
@@ -37,7 +39,13 @@ export function useRovingFocus(
       attributes: true,
       attributeFilter: ["disabled"],
     });
-    return () => observer.disconnect();
+    // A narrower group can hide items through CSS alone, which no mutation reports.
+    const resize = new ResizeObserver(sync);
+    resize.observe(root);
+    return () => {
+      observer.disconnect();
+      resize.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selector]);
 

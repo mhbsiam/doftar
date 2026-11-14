@@ -897,7 +897,8 @@ body > .fui-FluentProvider {
   margin-left: -4px;
 }
 /* The bar folds in steps as it narrows (small windows, large text): Compare and Split drop their words,
-   then the other edit commands, then Sort/View/Filter, and last New. rem tracks the text size.
+   then the other edit commands, then Sort/View/Filter, then New, and last the pattern button hides
+   (⇧⌘S, the Edit menu and the palette still reach it). rem tracks the text size.
    A toggle that is on (Split, in split view) keeps its word. Hidden labels stay in the accessibility tree
    and `title` gives a tooltip. CommandBar.visual.tsx checks that the bar fits at every width. */
 .commandbar {
@@ -906,7 +907,7 @@ body > .fui-FluentProvider {
 .cmd .cmd-icon {
   display: inline-flex;
 }
-@container commandbar (max-width: 86rem) {
+@container commandbar (max-width: 88.5rem) {
   .cmd.fold-first:not([aria-pressed="true"]) {
     width: 2.429rem;
     padding: 0;
@@ -920,7 +921,7 @@ body > .fui-FluentProvider {
     white-space: nowrap;
   }
 }
-@container commandbar (max-width: 79rem) {
+@container commandbar (max-width: 81.5rem) {
   .cmd.foldable:not([aria-pressed="true"]) {
     width: 2.429rem;
     padding: 0;
@@ -934,7 +935,7 @@ body > .fui-FluentProvider {
     white-space: nowrap;
   }
 }
-@container commandbar (max-width: 50rem) {
+@container commandbar (max-width: 53rem) {
   .new-btn {
     min-width: 0 !important;
     width: 2.429rem;
@@ -949,7 +950,12 @@ body > .fui-FluentProvider {
     white-space: nowrap;
   }
 }
-@container commandbar (max-width: 59rem) {
+@container commandbar (max-width: 46rem) {
+  .cmd.pattern-btn {
+    display: none;
+  }
+}
+@container commandbar (max-width: 61.5rem) {
   .cmd-right .cmd.horizontal {
     gap: 0.143rem;
     padding: 0 0.571rem;
