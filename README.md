@@ -187,18 +187,18 @@ More detail, and what Doftar stores where, is in [SECURITY.md](.github/SECURITY.
 
 ## Why I built this
 
-Doftar is a weekend hobby project that grew out of everyday frustration with
-the macOS Finder.
+Doftar is a weekend hobby project that grew out of everyday frustration with the macOS Finder.
 
 ## Why the name?
 
 *Doftar* (দফতর) is the Bengali word for an office. It comes from the Persian
 *daftar*, a register or ledger book where records were kept. A file manager is
-where your records are kept, so the name fit.
+where your records are kept, so the name fits.
 
 ## Acknowledgement
 
-Product design, aesthetics, and feature direction by me; code implementation assisted by AI models including Claude Fable 5.1/Opus 5.5, Devin SWE-2, and Codex GPT 6.1-Sol.
+AI models including but not limited to Claude Fable 5.1/Opus 5.5, Devin SWE-2, and Codex GPT 6.1-Sol generated the code and implemented the features, 
+while I led the product design, aesthetics, architecture, and debugging. The App has been tested across multiple devices for stability checks.
 
 ## Contributing
 
