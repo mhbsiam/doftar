@@ -1,6 +1,6 @@
 [package]
 name = "doftar"
-version = "1.0.1"
+version = "1.0.2"
 description = "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks."
 authors = ["Hasanul Banna Siam"]
 license = "Apache-2.0"
