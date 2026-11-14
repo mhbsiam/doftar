@@ -3,7 +3,7 @@
 ## 1.0.2 — 2026-11-13
 
 - Disk usage shows a Git worktrees card. It lists the linked git worktrees that the scan finds.
-- Each worktree shows its repository, branch, size, uncommitted changes, commits on no other branch and lock.
+- Each worktree shows its repository, branch, size, uncommitted changes and commits that no other branch has.
 - Move to Trash checks the worktree again. It asks before it removes work that is not committed.
 
 ## 1.0.1 — 2026-11-12
