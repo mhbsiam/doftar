@@ -124,13 +124,46 @@ fn toggle_maximize_window(window: WebviewWindow) -> Result<bool, String> {
     Ok(true)
 }
 
+/// For split view. On grows the window to twice its width and keeps its height, so it moves left
+/// and opens to the right (`openSplit` in tabs.ts does the same sum). Off puts back the frame from
+/// before. Returns whether the frame changed.
 #[tauri::command]
 fn set_window_maximized(window: WebviewWindow, on: bool) -> Result<bool, String> {
-    let is = PREV_FRAME.locked().iter().any(|(l, ..)| l == window.label());
-    if is == on {
+    let mut prev = PREV_FRAME.locked();
+    let at = prev.iter().position(|(l, ..)| l == window.label());
+    if !on {
+        let Some(i) = at else { return Ok(false) };
+        let (_, pos, size) = prev.remove(i);
+        zoom::set_frame(&window, pos, size).map_err(|e| e.to_string())?;
+        return Ok(true);
+    }
+    let area = *window
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "no monitor for window".to_string())?
+        .work_area();
+    let pos = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let (x, width) = split_frame(pos.x, size.width, area.position.x, area.size.width);
+    if width <= size.width {
         return Ok(false);
     }
-    toggle_maximize_window(window).map(|_| true)
+    // A frame saved by the maximize button is stale once the window grows from here.
+    if let Some(i) = at {
+        prev.remove(i);
+    }
+    prev.push((window.label().to_string(), pos, size));
+    let to = PhysicalPosition::new(x, pos.y);
+    zoom::set_frame(&window, to, PhysicalSize::new(width, size.height)).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+/// The left edge and width of a window `w` wide at `x` made twice as wide on the same centre,
+/// inside the screen area that starts at `area_x` and is `area_w` wide.
+fn split_frame(x: i32, w: u32, area_x: i32, area_w: u32) -> (i32, u32) {
+    let width = w.saturating_mul(2).min(area_w);
+    let left = x + w as i32 / 2 - width as i32 / 2;
+    (left.clamp(area_x, area_x + (area_w - width) as i32), width)
 }
 
 #[cfg(target_os = "macos")]
@@ -456,6 +489,21 @@ mod tests {
             .map(|c| c.trim().rsplit("::").next().unwrap().to_string())
             .filter(|c| !c.is_empty())
             .collect()
+    }
+
+    #[test]
+    fn split_doubles_the_window_on_its_centre_inside_the_screen() {
+        use super::split_frame;
+        // Room on both sides: it moves left by half its width.
+        assert_eq!(split_frame(800, 1000, 0, 3000), (300, 2000));
+        // Near the left edge: it stays at the edge and grows right.
+        assert_eq!(split_frame(100, 1000, 0, 3000), (0, 2000));
+        // Near the right edge: it ends at the edge.
+        assert_eq!(split_frame(1900, 1000, 0, 3000), (1000, 2000));
+        // Too wide to double: it fills the screen.
+        assert_eq!(split_frame(200, 1800, 0, 3000), (0, 3000));
+        // A screen to the left of the main one.
+        assert_eq!(split_frame(-2500, 1000, -3000, 3000), (-3000, 2000));
     }
 
     #[test]

@@ -2,7 +2,8 @@ import { afterEach, expect, test } from "vitest";
 import App from "./App";
 import { mount, settle } from "./test/mount";
 import { togglePreview } from "./actions";
-import { paneStore, usePanes } from "./stores/tabs";
+import { isSplitAnimating, paneStore, toggleSplit, usePanes } from "./stores/tabs";
+import { dur } from "./util/motion";
 import { useSettings } from "./stores/settings";
 
 const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
@@ -87,4 +88,36 @@ test("in split view both halves lay out alike, one preview hides the right navig
   await settle(700);
   expect(rightNav()).toBeCloseTo(navWidth, 0);
   expect(listing(0)).toBeCloseTo(listing(1), 0);
+});
+
+test("split view opens and closes with no pane left at a held width, and with a preview the seam does not jump at the end", async () => {
+  // No room beside the window, so the one pane narrows in place.
+  Object.defineProperty(window.screen, "availWidth", { value: 1200, configurable: true });
+  ({ unmount } = await mount(<App />, 1200));
+  togglePreview();
+  await settle(700);
+  const pane = (n: number) => document.querySelector<HTMLElement>(`.pane[data-pane="${n}"]`)!;
+
+  toggleSplit();
+  // The left half has narrowed. The right one is still unfolding.
+  await settle(dur("long") + 100);
+  expect(isSplitAnimating()).toBe(true);
+  const held = rect('.pane[data-pane="0"]').width;
+  await settle(dur("long"));
+  expect(isSplitAnimating()).toBe(false);
+  // Held at half the window, the seam would jump about 50px here. A few px remain: the right
+  // navigation pane closes for the preview just after the halves are measured.
+  expect(Math.abs(rect('.pane[data-pane="0"]').width - held)).toBeLessThan(4);
+  expect(listing(0)).toBeCloseTo(listing(1), 0);
+  // Only the styles React sets stay on the panes.
+  const animated = (n: number) => ["flex", "transition", "transform-origin"].map((p) => pane(n).style.getPropertyValue(p));
+  for (const n of [0, 1]) expect(animated(n)).toEqual(["", "", ""]);
+
+  toggleSplit();
+  await settle(dur("long") * 2);
+  expect(isSplitAnimating()).toBe(false);
+  expect(animated(0)).toEqual(["", "", ""]);
+  expect(rect('.pane[data-pane="0"]').width).toBeCloseTo(rect(".app").width, 0);
+  togglePreview();
+  delete (window.screen as { availWidth?: number }).availWidth;
 });

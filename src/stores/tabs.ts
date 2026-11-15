@@ -634,70 +634,119 @@ export function findTab(id: number): { store: TabsStore; tab: TabState } | null 
   return null;
 }
 
-/** True if opening split view grew the window. Closing it shrinks the window back. */
-let grewForSplit = false;
+/** The window's width before split view grew it, or 0 if it did not grow. Closing shrinks it back. */
+let grewFrom = 0;
 
 const setMaximized = (on: boolean) => invoke<boolean>("set_window_maximized", { on });
 
-/** Opens a second pane on the right. The window grows to full screen first. */
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const settled = (anims: Animation[]) => Promise.all(anims.map((a) => a.finished)).catch(() => {});
+
+/** Same easing as `wf-wave` in global.css. */
+const EASE = "cubic-bezier(0.45, 0, 0.25, 1)";
+
+/** Keyframe for a pane exactly `b` wide, which neither grows nor gives way to its neighbour. */
+const basis = (b: string) => ({ flexGrow: 0, flexShrink: 0, flexBasis: b });
+
+/**
+ * Opens a second pane on the right. The window moves left and grows right to twice its width
+ * (see `set_window_maximized` in main.rs) while the left pane keeps its width. Then the right
+ * half unfolds from the seam like a foldable phone.
+ */
 export function openSplit() {
   if (usePanes.getState().split || splitAnimating) return;
+  const left = document.querySelector<HTMLElement>('.pane[data-pane="0"]');
+  const app = left?.parentElement;
+  const w = app?.clientWidth ?? 0;
+  // Twice as wide, inside the screen. main.rs works out the same frame.
+  const f = app ? Math.min(2 * w, window.screen.availWidth) : w;
+  // With little room beside it, the window stays put and its one pane narrows instead.
+  const grow = f - w >= w / 4;
+  const grew = grow ? setMaximized(true).catch(() => false) : Promise.resolve(false);
   setSplitAnimating(true);
-  void setMaximized(true)
-    .catch(() => false)
-    .then(async (grew) => {
-      grewForSplit = grew;
-      // The glide returns at once, but the frame settles later.
-      if (grew) await new Promise((r) => setTimeout(r, dur("slow")));
-      const el = document.querySelector<HTMLElement>('.pane[data-pane="0"]');
-      const app = el?.parentElement;
-      if (!el || !app || reducedMotion()) return dosplit();
-      const cover = coverWith(app, [el]);
-      flushSync(dosplit);
-      await waveReveal(app, cover);
+  if (!left || !app || reducedMotion()) {
+    dosplit();
+    // Closing waits for the answer, so it knows whether to shrink the window back.
+    void grew.then((g) => (grewFrom = g ? w : 0)).finally(() => setSplitAnimating(false));
+    return;
+  }
+  flushSync(dosplit);
+  const right = app.querySelector<HTMLElement>(':scope > .pane[data-pane="1"]');
+  const width = grow ? f : w;
+  for (const el of [left, right]) if (el) el.style.transition = "none";
+  // The halves end at the widths the split CSS gives them (a preview makes them unequal). Both
+  // grow alike, so the right half gains half of what the window gains.
+  const rightEnd = right ? right.getBoundingClientRect().width + (width - w) / 2 : 0;
+  const leftEnd = width - rightEnd;
+  // The right half takes its final width at once, past the window edge if need be, so it never reflows.
+  if (right) right.style.flex = `0 0 ${rightEnd}px`;
+  const anims: Animation[] = [];
+  if (grow) {
+    // CSS only, so the native resize keeps it: the left pane stays w wide as the window grows
+    // and ends at leftEnd, which is less when the screen is too small to double.
+    const k = (leftEnd - w) / (f - w);
+    left.style.flex = `0 0 calc(${w}px + (100% - ${w}px) * ${k})`;
+  } else {
+    anims.push(left.animate([basis(`${w}px`), basis(`${leftEnd}px`)], { duration: dur("long"), easing: EASE }));
+  }
+  if (right) anims.push(...fold(right, left, true, width * 1.5, dur("base")));
+  void settled(anims)
+    .then(async () => {
+      for (const a of anims) a.cancel();
+      unpin(left, right);
+      grewFrom = (await grew) ? w : 0;
     })
     .finally(() => setSplitAnimating(false));
 }
 
-const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/** Same easing as `wf-wave` in global.css. */
-const WAVE_EASE = "cubic-bezier(0.45, 0, 0.25, 1)";
-
-function coverWith(app: HTMLElement, panes: HTMLElement[]) {
-  const cover = document.createElement("div");
-  cover.className = "pane-ghost";
-  cover.style.inset = "0";
-  app.appendChild(cover);
-  for (const pane of panes) paneGhost(pane, cover);
-  return cover;
+/**
+ * Take off the styles the split animations put on panes, and only those: React sets others.
+ * The split CSS eases flex-basis, which would squeeze one half and spring it back here, so the
+ * change lands with that switched off.
+ */
+function unpin(...els: (HTMLElement | null)[]) {
+  for (const el of els) {
+    el?.style.setProperty("transition", "none");
+    el?.style.removeProperty("flex");
+    el?.style.removeProperty("transform-origin");
+  }
+  void els[0]?.offsetWidth;
+  for (const el of els) el?.style.removeProperty("transition");
 }
 
 /**
- * Move the loading wave across the window once. `cover` shows the new layout behind the wave
- * and clips away with it.
+ * Turn `leaf` about the seam it shares with `still`: from edge on to flat when opening, and
+ * back when closing. `still` tilts back and blurs while it turns, like the two halves of a
+ * foldable phone. Nothing turns past edge on, so no pane ever shows its back.
  */
-async function waveReveal(app: HTMLElement, cover: HTMLElement) {
-  const wave = document.createElement("div");
-  wave.className = "pane-wave";
-  app.appendChild(wave);
-  // Slow wave: 1.5 times the longest page motion.
-  const opts = { duration: dur("long") * 1.5, easing: WAVE_EASE, fill: "forwards" as const };
-  await Promise.all([
-    cover.animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(0 0 0 100%)" }], opts).finished,
-    // The middle follows the clip edge from the left of the window to the right.
-    wave.animate(
+function fold(leaf: HTMLElement, still: HTMLElement, opening: boolean, depth: number, delay = 0) {
+  const right = leaf.offsetLeft > still.offsetLeft;
+  // The perspective() function, not the property on .app, which would trap position: fixed children.
+  const at = (deg: number) => `perspective(${Math.round(depth)}px) rotateY(${deg}deg)`;
+  leaf.style.transformOrigin = right ? "left center" : "right center";
+  still.style.transformOrigin = right ? "right center" : "left center";
+  // Edge on is a flat line, so it also fades there: the seam never shows a sliver.
+  const edge = { transform: at(right ? -90 : 90), opacity: 0 };
+  const flat = { transform: at(0), opacity: 1 };
+  const opts = {
+    duration: dur("long") * (opening ? 1.1 : 0.75),
+    delay,
+    easing: opening ? EASE : "ease-in",
+    fill: "both" as const,
+  };
+  const tilt = right ? 14 : -14;
+  return [
+    leaf.animate(opening ? [edge, { opacity: 1, offset: 0.1 }, flat] : [flat, { opacity: 1, offset: 0.85 }, edge], opts),
+    still.animate(
       [
-        { transform: "translateX(-50%)", opacity: 0 },
-        { opacity: 1, offset: 0.15 },
-        { opacity: 1, offset: 0.85 },
-        { transform: "translateX(200%)", opacity: 0 },
+        { transform: at(0), filter: "blur(0px)" },
+        { transform: at(tilt), filter: "blur(5px)", offset: opening ? 0.35 : 0.5 },
+        { transform: at(0), filter: "blur(0px)" },
       ],
       opts
-    ).finished,
-  ]).catch(() => {});
-  cover.remove();
-  wave.remove();
+    ),
+  ];
 }
 
 function dosplit() {
@@ -719,26 +768,9 @@ function dosplit() {
   usePanes.setState({ split: true, focused: 1 });
 }
 
-function paneGhost(el: HTMLElement, app: HTMLElement) {
-  const a = app.getBoundingClientRect();
-  const r = el.getBoundingClientRect();
-  const ghost = el.cloneNode(true) as HTMLElement;
-  ghost.classList.add("pane-ghost");
-  ghost.removeAttribute("data-pane");
-  ghost.setAttribute("aria-hidden", "true");
-  ghost.setAttribute("inert", "");
-  for (const n of ghost.querySelectorAll("[id]")) n.removeAttribute("id");
-  ghost.style.left = `${r.left - a.left}px`;
-  ghost.style.top = `${r.top - a.top}px`;
-  ghost.style.width = `${r.width}px`;
-  ghost.style.height = `${r.height}px`;
-  app.appendChild(ghost);
-  return ghost;
-}
-
 /**
  * Return to one pane and keep pane `keep`. Turning split off keeps the left pane. Closing the
- * last tab of a half keeps the other pane.
+ * last tab of a half keeps the other pane. The other half folds shut, then the window shrinks back.
  */
 export function closeSplit(keep = 0) {
   if (!usePanes.getState().split || splitAnimating) return;
@@ -749,12 +781,33 @@ export function closeSplit(keep = 0) {
     return shrink();
   }
   setSplitAnimating(true);
-  const cover = coverWith(app, halves);
+  void foldShut(app, halves[0], halves[1], keep).finally(() => setSplitAnimating(false));
+}
+
+async function foldShut(app: HTMLElement, left: HTMLElement, right: HTMLElement, keep: number) {
+  const kept = keep ? right : left;
+  const folding = fold(keep ? left : right, kept, false, app.clientWidth * 1.5);
+  await settled(folding);
+  // The one pane left starts where the kept half was and as wide, and the window closes in on it.
+  const { left: x, width } = kept.getBoundingClientRect();
+  const wide = app.clientWidth;
+  const from = grewFrom;
   flushSync(() => unsplit(keep));
-  void waveReveal(app, cover).finally(() => {
-    setSplitAnimating(false);
-    shrink();
-  });
+  for (const a of folding) a.cancel();
+  // React keeps the left pane's element. It now shows the kept half's tabs. As the window shrinks
+  // from `wide` back to `from`, the pane goes from its width to the whole window (CSS only, as in openSplit).
+  const k = from && from !== wide ? (from - width) / (from - wide) : 0;
+  Object.assign(left.style, { flex: `0 0 calc(${width}px + (100% - ${wide}px) * ${k})`, transition: "none" });
+  const opts = { duration: dur("long"), easing: EASE };
+  const moves: Animation[] = [];
+  const dx = x - left.getBoundingClientRect().left;
+  if (dx) moves.push(left.animate([{ transform: `translateX(${dx}px)` }, { transform: "none" }], opts));
+  if (!from) moves.push(left.animate([basis(`${width}px`), basis("100%")], opts));
+  shrink();
+  // The native glide has no end event. It lasts GLIDE in zoom.rs, which the "slow" token outlasts.
+  await Promise.all([settled(moves), from && new Promise((r) => setTimeout(r, dur("slow")))]);
+  for (const a of moves) a.cancel();
+  unpin(left);
 }
 
 let splitAnimating = false;
@@ -768,8 +821,8 @@ function setSplitAnimating(on: boolean) {
 }
 
 function shrink() {
-  if (grewForSplit) void setMaximized(false).catch(() => {});
-  grewForSplit = false;
+  if (grewFrom) void setMaximized(false).catch(() => {});
+  grewFrom = 0;
 }
 
 function unsplit(keep: number) {

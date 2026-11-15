@@ -479,7 +479,7 @@ body > .fui-FluentProvider {
   display: flex;
   flex-direction: column;
 }
-.pane + .pane:not(.pane-ghost) {
+.pane + .pane {
   position: relative;
 }
 /* Draw the seam over the bars, so it runs top to bottom. */
@@ -513,34 +513,6 @@ body > .fui-FluentProvider {
   .app.split:has(> .pane > .main > .preview-slot.resizing) > .pane {
     transition: none;
   }
-}
-/* Closing a half: a still copy slides out past the window side, over the other half.
-   The other half already has the full width below. See closeSplit in stores/tabs.ts. */
-.pane-ghost {
-  position: absolute;
-  z-index: 20;
-  overflow: clip;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-.pane-ghost::before {
-  content: none;
-}
-/* The loading wave crosses the window once when split view opens or closes.
-   The new layout shows behind it. See waveReveal in stores/tabs.ts. */
-.pane-wave {
-  position: absolute;
-  inset: -2rem auto -2rem 0;
-  width: 40%;
-  z-index: 21;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--accent) 28%, transparent),
-    transparent
-  );
-  filter: blur(14px);
-  pointer-events: none;
 }
 /* Marks the half that commands, shortcuts and paste act on. */
 .app.split .content-frame::after {
