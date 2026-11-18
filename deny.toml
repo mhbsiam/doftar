@@ -8,6 +8,9 @@ targets = ["aarch64-apple-darwin"]
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  { id = "RUSTSEC-2026-0543", reason = "unmaintained, no fix; pulled in by arrow/parquet only" },
+]
 
 [licenses]
 version = 2
