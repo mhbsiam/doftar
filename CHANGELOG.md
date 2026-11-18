@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.3 — 2026-11-18
+
+- Split view opens and closes with a fold animation.
+- If the screen does not have sufficient space, the left pane becomes narrower.
+- A Select by Pattern button (*) is adjacent to the command palette.
+- Column names in data tables align with their columns.
+- Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).
+
 ## 1.0.2 — 2026-11-13
 
 - Disk usage shows a Git worktrees card. It lists the linked git worktrees that the scan finds.
