@@ -6248,8 +6248,6 @@ body .fui-Tooltip {
   z-index: 2;
   border-bottom: 1px solid var(--md-rule);
   background: var(--md-code-bg);
-  font-family: var(--font);
-  font-weight: 600;
 }
 .dv-head .dv-td {
   display: flex;
@@ -6271,7 +6269,10 @@ body .fui-Tooltip {
 .dv-sort:hover {
   background: var(--md-inline-code);
 }
+/* The UI font goes on the label, not the row: column widths are in ch, which must measure the monospace font the data rows use. */
 .dv-th-name {
+  font-family: var(--font);
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 0.6ch;
