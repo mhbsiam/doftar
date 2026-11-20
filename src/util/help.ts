@@ -158,6 +158,8 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Split view",
         points: [
           "⌘\\ shows two folders side by side. The new side starts as a copy of the current tab, history included.",
+          "If the screen has room, the window grows to make room for the new side, and shrinks back when split view closes. If not, the window stays the same and the two sides share it.",
+          "Esc closes split view and keeps the side you are on. If a cut is waiting, the first Esc cancels the cut.",
           "Each side has its own tabs and search. The window has one preview bar, at its right edge. While it's open, the right side's navigation pane is hidden. It comes back when you close the bar.",
           "Paste, new tabs, search and menu commands go to the side you last clicked. F6 moves to the other side.",
           "Drag between the sides to move or copy. Closing the last tab on one side closes that side.",
@@ -167,7 +169,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Tabs and windows",
         points: [
           "Each tab has its own Back and Forward, and remembers the scroll, selection and filters of every step.",
-          "A sideways two-finger swipe over the files goes Back and Forward, as the mouse side buttons do. A list that scrolls sideways keeps the swipe.",
+          "A sideways two-finger swipe over the files goes Back and Forward, as the mouse side buttons do. An arrow shows where it goes. A list that scrolls sideways keeps the swipe. Settings → Files turns the swipe off.",
           "Drag a tab to the other side, onto another window's tab strip, or out to open it in a new window.",
           "Closing the last tab of the main window opens Home instead. ⌘⇧T reopens closed tabs, newest first, with their history.",
           "Right-click a tab to close the other tabs, or the tabs to its right. ⌃Tab and ⌃⇧Tab, or ⌘⇧] and ⌘⇧[, move between tabs.",
@@ -268,7 +270,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Selecting",
         points: [
-          "Select by Pattern (⌘⇧S) selects the shown items whose names match. * is any text, ? is one character, and commas separate patterns: *.csv, report-??.",
+          "Select by Pattern (⌘⇧S, or the * button next to the command palette button) selects the shown items whose names match. * is any text, ? is one character, and commas separate patterns: *.csv, report-??.",
           "A pattern with no * or ? matches names that contain it. Letter case doesn't matter.",
           "Invert Selection (⌘⇧I) selects everything shown that isn't selected.",
         ],
@@ -398,8 +400,10 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Delete offers the Trash or deleting permanently. For Conda environments it copies the command that removes them.",
           "The last report stays until you scan again.",
           "Duplicate files compares the content of files of 1 MB and more in your home folder, when you ask. One copy of each file always stays; the rest can go to the Trash.",
+          "Git worktrees lists the linked worktrees the scan finds, with their repository, branch and size. Open the card to see uncommitted changes and commits that no other branch has.",
+          "Move to Trash checks a worktree again first. If it has uncommitted changes, or commits on no branch, Doftar asks before it moves it.",
         ],
-        limits: ["Duplicates skip hidden items and the insides of apps. A copy made on the same APFS drive shares storage with the original, so removing it may free nothing."],
+        limits: ["A locked worktree can't be moved to the Trash. Unlock it with git worktree unlock first.", "Duplicates skip hidden items and the insides of apps. A copy made on the same APFS drive shares storage with the original, so removing it may free nothing."],
         tip: "Give Doftar Full Disk Access in System Settings for a complete picture.",
       },
       {
@@ -407,7 +411,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         points: [
           "Changed files show a badge. The Repos page lists every repository in your home folder with its history.",
           "Doftar never fetches, so “ahead” and “behind” are as of your last fetch.",
-          "Switching branch is the only change Doftar makes. It refuses during a merge or rebase, with Git LFS, or if your changes would be overwritten.",
+          "Switching branch is the only change Doftar makes inside a repository. It refuses during a merge or rebase, with Git LFS, or if your changes would be overwritten.",
         ],
         limits: ["The history shows the last 200 commits.", "Repositories more than 7 folders deep, or in hidden folders, aren't listed."],
       },
@@ -436,8 +440,10 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         points: [
           "iCloud, Dropbox, Google Drive, OneDrive, Box and others are recognised. A mark shows whether a file is on this Mac or only online.",
           "Opening or previewing an online-only file downloads it first.",
+          "Copying or moving online-only files to another place downloads them first, so the copy has the real content.",
           "Deleting in a cloud drive asks first, because it deletes on every device.",
         ],
+        limits: ["Cancel waits until the file that is downloading arrives."],
       },
       {
         title: "Network and external drives",

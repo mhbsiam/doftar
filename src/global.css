@@ -3156,24 +3156,31 @@ html[data-vt="back"] .content.cols {
 }
 
 .dialog.help {
-  width: 54rem;
-  height: 40rem;
+  width: 72rem;
+  height: 52rem;
+}
+.help-search {
+  margin-left: auto;
+  width: 18rem;
+  font-weight: normal;
 }
 .help-layout {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 1.143rem;
-  margin-top: 0.857rem;
+  gap: 1.714rem;
+  margin-top: 1.143rem;
 }
 .help-nav {
   flex: none;
-  width: 13rem;
+  width: 18rem;
   display: flex;
   flex-direction: column;
   gap: 0.143rem;
   overflow: auto;
-  padding-bottom: 1.714rem;
+  overscroll-behavior: contain;
+  padding: 0 0.286rem 1.714rem 0;
+  border-right: 1px solid var(--border);
 }
 .help-nav button {
   font: inherit;
@@ -3182,8 +3189,12 @@ html[data-vt="back"] .content.cols {
   background: none;
   border: none;
   border-radius: var(--radius-s);
-  padding: 0.429rem 0.714rem;
+  padding: 0.357rem 0.714rem;
   cursor: default;
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .help-nav button:hover {
   background: var(--bg-hover);
@@ -3194,20 +3205,44 @@ html[data-vt="back"] .content.cols {
   color: var(--text);
   font-weight: 600;
 }
+.help-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.286rem;
+  margin: -0.571rem 0 1.429rem;
+}
 .dialog-body.help-body {
   flex: 1;
   margin-top: 0;
+  padding-right: 1rem;
   white-space: normal;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text);
 }
+.help-body > * {
+  max-width: 46rem;
+}
+.help-body section {
+  scroll-margin-top: 0.571rem;
+}
+.help-body section + section {
+  margin-top: 1.714rem;
+}
+.help-from {
+  margin: 0;
+  font-size: 0.857rem;
+  color: var(--text-3);
+}
+.help-empty {
+  color: var(--text-2);
+}
 .help-body h2 {
-  margin: 0 0 0.571rem;
+  margin: 0 0 1.143rem;
   font-size: 1.143rem;
   font-weight: 600;
 }
 .help-body h3 {
-  margin: 1.143rem 0 0.286rem;
+  margin: 0 0 0.429rem;
   font-size: 1rem;
   font-weight: 600;
 }

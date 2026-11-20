@@ -492,32 +492,75 @@ function ShortcutsDialog() {
 function HelpDialog() {
   const setOpen = useUI((s) => s.setHelpOpen);
   const close = useCallback(() => setOpen(false), [setOpen]);
-  const { primaryRef, dialogRef } = useDialogKeys(close, close);
-  const [at, setAt] = useState(0);
+  const [query, setQuery] = useState("");
+  // Esc clears a search before it closes Help. Enter in the search box doesn't close it.
   const body = useRef<HTMLDivElement>(null);
-  const section = HELP[at];
+  const escape = useCallback(() => {
+    if (!query) return close();
+    setQuery("");
+    body.current?.scrollTo(0, 0);
+  }, [query, close]);
+  const enter = useCallback(() => document.activeElement?.tagName !== "INPUT" && close(), [close]);
+  const { primaryRef, dialogRef } = useDialogKeys(escape, enter);
+  const [at, setAt] = useState(0);
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length
+    ? HELP.flatMap((s) =>
+        s.topics
+          .filter((t) => {
+            const text = [s.title, t.title, ...t.points, t.tip ?? "", ...(t.limits ?? [])].join(" ").toLowerCase();
+            return words.every((w) => text.includes(w));
+          })
+          .map((t) => ({ section: s.title, t }))
+      )
+    : HELP[at].topics.map((t) => ({ section: null, t }));
   const show = (i: number) => {
+    setQuery("");
     setAt(i);
     body.current?.scrollTo(0, 0);
   };
+  const jump = (j: number) => body.current?.querySelector(`[data-topic="${j}"]`)?.scrollIntoView({ block: "start" });
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div ref={dialogRef} className="dialog help" role="dialog" aria-modal="true" aria-labelledby="wf-dialog-title">
         <div className="dialog-title">
           <span id="wf-dialog-title">Help</span>
+          <input
+            type="search"
+            className="text-input help-search"
+            placeholder="Search help"
+            aria-label="Search help"
+            spellCheck={false}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              body.current?.scrollTo(0, 0);
+            }}
+          />
         </div>
         <div className="help-layout">
           <nav className="help-nav" aria-label="Help topics">
             {HELP.map((s, i) => (
-              <button key={s.title} aria-current={i === at ? "true" : undefined} onClick={() => show(i)}>
+              <button key={s.title} aria-current={!words.length && i === at ? "true" : undefined} onClick={() => show(i)}>
                 {s.title}
               </button>
             ))}
           </nav>
-          <div ref={body} className="dialog-body help-body" tabIndex={0} aria-label={section.title}>
-            <h2>{section.title}</h2>
-            {section.topics.map((t) => (
-              <section key={t.title}>
+          <div ref={body} className="dialog-body help-body" tabIndex={0} aria-label={words.length ? "Search results" : HELP[at].title}>
+            <h2>{words.length ? `${shown.length} ${shown.length === 1 ? "topic matches" : "topics match"} “${query.trim()}”` : HELP[at].title}</h2>
+            {!words.length && (
+              <nav className="help-toc" aria-label="On this page">
+                {HELP[at].topics.map((t, j) => (
+                  <button key={t.title} className="btn subtle compact" onClick={() => jump(j)}>
+                    {t.title}
+                  </button>
+                ))}
+              </nav>
+            )}
+            {words.length > 0 && shown.length === 0 && <p className="help-empty">Nothing matches. Try fewer or shorter words.</p>}
+            {shown.map(({ section, t }, j) => (
+              <section key={`${section}/${t.title}`} data-topic={j}>
+                {section && <p className="help-from">{section}</p>}
                 <h3>{t.title}</h3>
                 <ul>
                   {t.points.map((p) => (
