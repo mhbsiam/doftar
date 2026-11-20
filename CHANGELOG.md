@@ -5,6 +5,9 @@
 - Split view opens and closes with a fold animation.
 - If the screen does not have sufficient space, the left pane becomes narrower.
 - A Select by Pattern button (*) is adjacent to the command palette.
+- Esc closes split view and keeps the pane that you use. If a cut is pending, Esc cancels the cut first.
+- Help is larger. A search box finds topics in all sections, and each section starts with links to its topics.
+- Help tells about the features added since 1.0.1.
 - Column names in data tables align with their columns.
 - Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).
 
