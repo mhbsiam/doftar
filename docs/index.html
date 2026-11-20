@@ -490,7 +490,7 @@
 
 <section class="band" id="install">
   <h2>Install in a minute</h2>
-  <p>Doftar isn't notarized yet, so macOS asks you to allow it once.</p>
+  <p>Doftar stays free by skipping Apple's $99 yearly notarization fee, so macOS asks you to allow it once. The <a href="https://github.com/mhbsiam/doftar">code is open</a> for anyone to check.</p>
   <a class="pill pill-light get" href="https://github.com/mhbsiam/doftar/releases/latest"><svg class="pi"><use href="#dl"/></svg> Download Doftar</a>
   <ol class="steps">
     <li><a href="assets/install/1-download.png"><img src="assets/install/1-download.png" width="548" height="450" loading="lazy" decoding="async" alt="A GitHub release page with doftar_v1.0.0_stable_macos.dmg highlighted under Assets"></a><strong><span class="n">1</span>Download the DMG</strong><p>Click the <b>.dmg</b> under Assets on the release page.</p></li>
@@ -578,6 +578,10 @@
 </footer>
 
 <script>
+// Pull the header in to a pill once the page scrolls.
+const bar = document.querySelector('.top');
+addEventListener('scroll', () => bar.classList.toggle('scrolled', scrollY > 8), { passive: true });
+
 // Move the screens on every 5s. Hover or focus pauses; any swipe, click, key or sideways scroll stops it for good.
 (() => {
   const row = document.querySelector('.shots');

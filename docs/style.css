@@ -15,7 +15,8 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Keeps anchor jumps and focused items clear of the sticky header. */
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 80px; }
 body {
   margin: 0;
   background: #fff;
@@ -53,6 +54,21 @@ code { font: 0.88em var(--mono); padding: 1px 5px; border-radius: 5px; backgroun
   margin: 0 auto;
   padding: 7px 16px;
   font-size: 15px;
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  transition: max-width 400ms var(--ease), padding 400ms var(--ease), background-color 300ms, border-color 300ms;
+}
+/* Once the page scrolls, the header pulls in to a frosted pill. */
+.top.scrolled {
+  max-width: min(760px, 100% - 16px);
+  padding-inline: 22px;
+  background: rgb(255 255 255 / 0.78);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border-color: var(--line);
 }
 /* 44px tall to tap. The padding replaces the header padding. */
 .top a { padding: 11px 0; text-decoration: none; }
@@ -432,7 +448,7 @@ section { padding: 0 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pill, .pill svg { transition: none; }
+  .top, .pill, .pill svg { transition: none; }
   .pill:hover, .pill:active, .pill:hover svg { transform: none; }
   .shots > li > * { animation: none; }
   .shots > li + li { margin-left: 0; }
