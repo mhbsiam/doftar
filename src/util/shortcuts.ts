@@ -47,6 +47,7 @@ export const SHORTCUTS: { group: string; keys: [string, string, string?][] }[] =
       ["Next / Previous tab", "⌃Tab / ⌃⇧Tab or ⌘⇧] / ⌘⇧[", "Ctrl+Tab / Ctrl+Shift+Tab"],
       ["Move tab left / right", "⌘⇧← / ⌘⇧→", "Ctrl+Shift+← / →"],
       ["Split view", "⌘\\"],
+      ["Leave split view", "Esc"],
       ["Preview bar", "⇧⌘P", "Ctrl+Shift+P"],
       ["Switch to the other pane", "F6"],
       ["Folder tree", "⌘⇧E"],

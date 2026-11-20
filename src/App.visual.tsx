@@ -5,6 +5,7 @@ import { togglePreview } from "./actions";
 import { isSplitAnimating, paneStore, toggleSplit, usePanes } from "./stores/tabs";
 import { dur } from "./util/motion";
 import { useSettings } from "./stores/settings";
+import { useClipboard } from "./stores/clipboard";
 
 const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
 const listing = (pane: number) => rect(`.pane[data-pane="${pane}"] .content-frame`).width;
@@ -120,4 +121,23 @@ test("split view opens and closes with no pane left at a held width, and with a 
   expect(rect('.pane[data-pane="0"]').width).toBeCloseTo(rect(".app").width, 0);
   togglePreview();
   delete (window.screen as { availWidth?: number }).availWidth;
+});
+
+test("Escape cancels a pending cut first, then leaves split view keeping the focused pane", async () => {
+  ({ unmount } = await mount(<App />, 1200));
+  toggleSplit();
+  await settle(dur("long") * 2);
+  const escape = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+  useClipboard.setState({ op: "cut" });
+  escape();
+  expect(useClipboard.getState().op).toBe("copy");
+  expect(usePanes.getState().split).toBe(true);
+
+  const rightTab = paneStore(1).getState().activeId;
+  usePanes.setState({ focused: 1 });
+  escape();
+  await settle(dur("long") * 2);
+  expect(usePanes.getState().split).toBe(false);
+  expect(paneStore(0).getState().activeId).toBe(rightTab);
 });

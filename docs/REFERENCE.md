@@ -145,6 +145,7 @@ Mac keys first; the Windows-style keys in the right column also work.
 | Folder tree | `⌘⇧E` | |
 | Close window | `⌘⇧W` | |
 | Split view / switch pane | `⌘\` / `F6` | `F6` |
+| Leave split view (keeps the focused pane) | `Esc` | `Esc` |
 | Preview bar (double-click and Enter then preview instead of opening) | `⇧⌘P` | `Ctrl + Shift + P` |
 | Open selection | `⌘↓` | `Enter` |
 | Properties | `⌘I` or `⌥Enter` | `Alt + Enter` |

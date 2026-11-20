@@ -20,8 +20,8 @@ import {
   openNewWindow,
 } from "../actions";
 import { api } from "../ipc";
-import { uncut } from "../stores/clipboard";
-import { focusPane, paneAt, paneStore, reopenClosedTab, useTabs } from "../stores/tabs";
+import { uncut, useClipboard } from "../stores/clipboard";
+import { closeSplit, focusPane, paneAt, paneStore, reopenClosedTab, usePanes, useTabs } from "../stores/tabs";
 import { useSettings } from "../stores/settings";
 import { activeModal, useUI } from "../stores/ui";
 import { swipeTracker } from "../util/swipe";
@@ -43,8 +43,10 @@ export function useShortcuts() {
       if (e.key === "Escape") {
         void api.quicklookClose().catch(() => {});
         tabs.setRenaming(null);
-        // Cancel a pending cut, as Explorer does.
-        if (!isEditable(e.target)) uncut();
+        if (isEditable(e.target)) return;
+        // Cancel a pending cut, as Explorer does. Only an Escape with nothing else to cancel leaves split view.
+        if (useClipboard.getState().op === "cut") uncut();
+        else if (!e.defaultPrevented && !activeModal()) closeSplit(usePanes.getState().focused);
         return;
       }
       if (isEditable(e.target)) return;
