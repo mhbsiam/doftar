@@ -1030,7 +1030,14 @@ mod tests {
     #[test]
     fn recognises_extractable_names() {
         assert!(is_extractable("A.ZIP") && is_extractable("a.tar.gz") && is_extractable("a.tgz"));
-        assert!(is_extractable("a.7z") && is_extractable("B.RAR") && is_extractable("disc.iso"));
+        // Linux opens 7z, RAR and ISO through bsdtar, so only when it is installed.
+        #[cfg(not(target_os = "macos"))]
+        let exotic = have("bsdtar");
+        #[cfg(target_os = "macos")]
+        let exotic = true;
+        if exotic {
+            assert!(is_extractable("a.7z") && is_extractable("B.RAR") && is_extractable("disc.iso"));
+        }
         assert!(!is_extractable("a.gz") && !is_extractable("a.txt"));
         assert_eq!(archive_stem("Photos.tar.gz"), "Photos");
         assert_eq!(archive_stem("Photos.7z"), "Photos");
