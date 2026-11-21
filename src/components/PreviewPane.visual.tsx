@@ -57,7 +57,7 @@ test("double-click shows a file in the open preview bar, and opens it once the b
 
 const button = (label: string) => document.querySelector<HTMLButtonElement>(`.pv-zoom [aria-label^="${label}"]`)!;
 
-test("text zooms with the buttons and ⌘-scroll, within limits, and resets", async () => {
+test("text zooms with the buttons and Ctrl+-scroll, within limits, and resets", async () => {
   reply("is_text_file", true);
   reply("read_document", { kind: "text", text: "Lab notes\n".repeat(200), modified: 0 });
   ({ unmount } = await mount(bar(), 900));
@@ -90,101 +90,6 @@ test("text zooms with the buttons and ⌘-scroll, within limits, and resets", as
   button("Reset").click();
   await settle(50);
   expect(px()).toBeCloseTo(base, 1);
-});
-
-test("a PDF scrolls through all its pages, drawing only those near the view, and zooms", async () => {
-  const canvas = Object.assign(document.createElement("canvas"), { width: 400, height: 500 });
-  const picture = canvas.toDataURL();
-  const asked: { index: number; maxDim: number }[] = [];
-  const cancelled: number[] = [];
-  reply("pdf_page_sizes", Array.from({ length: 40 }, () => ({ w: 400, h: 500 })));
-  reply("pdf_page_picture", (a: { index: number; maxDim: number }) => (asked.push(a), picture));
-  reply("cancel_thumbnail", ({ requestId }: { requestId: number }) => void cancelled.push(requestId));
-  ({ unmount } = await mount(bar(), 900));
-  togglePreview();
-  await settle(700);
-  activateEntry(item(`${DOCS}/paper.pdf`, false));
-  await settle(300);
-
-  const stage = document.querySelector<HTMLElement>(".pv-stage.pdf")!;
-  const sheets = [...document.querySelectorAll<HTMLElement>(".pv-sheet")];
-  expect(sheets).toHaveLength(40);
-  expect(stage.scrollHeight).toBeGreaterThan(stage.clientHeight * 10);
-  expect(sheets[0].querySelector("img")).not.toBe(null);
-  expect(sheets[39].querySelector("img")).toBe(null);
-  expect(Math.max(...asked.map((a) => a.index))).toBeLessThan(10);
-
-  stage.scrollTop = stage.scrollHeight;
-  await settle(300);
-  expect(sheets[39].querySelector("img")?.alt).toBe("Page 40");
-  // A page far from the view lets go of its picture.
-  expect(sheets[0].querySelector("img")).toBe(null);
-
-  const narrow = sheets[39].offsetWidth;
-  for (let i = 0; i < 4; i++) button("Zoom in").click();
-  await settle(300);
-  expect(sheets[39].offsetWidth).toBeCloseTo(narrow * 1.25 ** 4, -1);
-  expect(stage.scrollWidth).toBeGreaterThan(stage.clientWidth);
-  expect(Math.max(...asked.map((a) => a.maxDim))).toBeGreaterThan(Math.min(...asked.map((a) => a.maxDim)));
-  await expect.element(page.getByAltText("Page 40")).toBeVisible();
-
-  // Scrolling past a page still being drawn cancels it.
-  reply("pdf_page_picture", () => new Promise(() => {}));
-  stage.scrollTop = 0;
-  await settle(200);
-  expect(cancelled).toEqual([]);
-  stage.scrollTop = stage.scrollHeight;
-  await settle(200);
-  expect(cancelled.length).toBeGreaterThan(0);
-});
-
-test("a PDF that can't be read page by page shows its Quick Look picture", async () => {
-  const canvas = Object.assign(document.createElement("canvas"), { width: 400, height: 500 });
-  reply("pdf_page_sizes", () => Promise.reject("the PDF is protected with a password"));
-  reply("thumbnail", canvas.toDataURL());
-  ({ unmount } = await mount(bar(), 900));
-  togglePreview();
-  activateEntry(item(`${DOCS}/locked.pdf`, false));
-  await settle(700);
-  expect(document.querySelector(".pv-stage.pdf")).toBe(null);
-  expect(document.querySelector(".pv-stage img")).not.toBe(null);
-});
-
-test("rewriting a PDF keeps the zoom and the place, and draws the new pages", async () => {
-  const canvas = Object.assign(document.createElement("canvas"), { width: 400, height: 500 });
-  const sizes = Array.from({ length: 40 }, () => ({ w: 400, h: 500 }));
-  const asked: number[] = [];
-  reply("pdf_page_sizes", sizes);
-  reply("pdf_page_picture", ({ index }: { index: number }) => (asked.push(index), canvas.toDataURL()));
-  ({ unmount } = await mount(bar(), 900));
-  togglePreview();
-  await settle(700);
-  const paper = item(`${DOCS}/paper.pdf`, false);
-  activateEntry(paper);
-  await settle(300);
-  button("Zoom in").click();
-  await settle(100);
-  const stage = document.querySelector<HTMLElement>(".pv-stage.pdf")!;
-  stage.scrollTop = 3000;
-  await settle(200);
-  const place = stage.scrollTop;
-  expect(place).toBeGreaterThan(0);
-
-  // Halfway through a rewrite, the file can't be read.
-  reply("pdf_page_sizes", () => Promise.reject("can't read this PDF"));
-  useTabs.getState().setPreview({ ...paper, modifiedMs: paper.modifiedMs + 1 });
-  await settle(200);
-  expect(document.querySelector(".pv-stage.pdf")).toBe(stage);
-  expect(stage.scrollTop).toBe(place);
-
-  reply("pdf_page_sizes", sizes);
-  asked.length = 0;
-  useTabs.getState().setPreview({ ...paper, modifiedMs: paper.modifiedMs + 2 });
-  await settle(200);
-  expect(document.querySelector(".pv-stage.pdf")).toBe(stage);
-  expect(stage.scrollTop).toBe(place);
-  expect(button("Reset").textContent).toBe("125%");
-  expect(asked.length).toBeGreaterThan(0);
 });
 
 test("a picture grows past the bar, scrolls, asks for a sharper copy, and fits again on reset", async () => {

@@ -12,7 +12,7 @@ describe("matchScore", () => {
   it("ranks word starts and runs above scattered letters", () => {
     expect(matchScore("new", "New tab")).toBeGreaterThan(matchScore("new", "Show or hide navigation pane"));
     expect(matchScore("split", "Split view")).toBeGreaterThan(matchScore("split", "Show or hide item check boxes"));
-    expect(matchScore("down", "Downloads")).toBeGreaterThan(matchScore("down", "Open selection ⌘↓ down"));
+    expect(matchScore("down", "Downloads")).toBeGreaterThan(matchScore("down", "Open selection Ctrl+↓ down"));
   });
 });
 
@@ -38,7 +38,7 @@ describe("visitBonus", () => {
 
 describe("keysOf", () => {
   it("gives a menu the shortcut of the same command", () => {
-    expect(keysOf("duplicate")).toBe("⌘D");
+    expect(keysOf("duplicate")).toBe("Ctrl+D");
     expect(keysOf("compress")).toBeUndefined();
   });
 });

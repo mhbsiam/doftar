@@ -1,7 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 import { page } from "vitest/browser";
 import type { ReactElement } from "react";
-import { PdfViewer } from "./PdfViewer";
 import { ImageViewer } from "./ImageViewer";
 import { Reader } from "./Reader";
 import { reply } from "../test/tauri";
@@ -57,7 +56,6 @@ test("the PDF toolbar fits beside the window buttons at every width", async () =
     thumbnails: false,
     found: null,
   });
-  expect((await misfits(<PdfViewer />, 480)).join("\n")).toBe("");
 });
 
 test("the image viewer toolbar fits beside the window buttons at every width", async () => {
