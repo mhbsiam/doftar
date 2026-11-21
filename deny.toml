@@ -10,6 +10,11 @@ version = 2
 yanked = "deny"
 ignore = [
   { id = "RUSTSEC-2026-0543", reason = "unmaintained, no fix; pulled in by arrow/parquet and trash (freedesktop deletion dates)" },
+  # Linux only. Tauri's GTK stack and its opener plugin bring these in; Doftar can't replace them.
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: unmaintained, build-time only; via glib-macros in the GTK 0.18 bindings" },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant: unmaintained; via zbus in tauri-plugin-opener" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names: unmaintained; via zbus in tauri-plugin-opener" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: unmaintained, build-time only; via zbus in tauri-plugin-opener" },
 ]
 
 [licenses]
