@@ -4,10 +4,11 @@
 
 <h1 align="center">Doftar</h1>
 
-<p align="center">A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.</p>
+<p align="center">A free, offline file manager for macOS, with tabs, split view and built-in viewers for code, data and notebooks. Now also on Linux as a preview.</p>
 
 <p align="center">
-  <a href="https://github.com/mhbsiam/doftar/releases/latest">Download</a> &middot;
+  <a href="https://github.com/mhbsiam/doftar/releases/latest">Download for Mac</a> &middot;
+  <a href="#linux-preview">Linux (preview)</a> &middot;
   <a href="https://doftar.app/">Website</a> &middot;
   <a href="docs/REFERENCE.md">Full feature list</a>
 </p>
@@ -28,7 +29,7 @@ else installed.
 - **Tabs and split view.** Two folders in one window, each with its own tabs.
 - **An address bar you can type into**, and a folder tree with sizes and size bars.
 - **Your data, read in place.** Tables, AnnData, SQLite, notebooks and model weights, without opening Python.
-- **No network.** No update check or telemetry. Doftar has no networking code, and a sandbox blocks network sockets in its main process.
+- **No network.** No update check or telemetry. Doftar has no networking code. On macOS, a sandbox also blocks network sockets in its main process.
 
 ## Install
 
@@ -71,6 +72,30 @@ shasum -a 256 -c SHA256SUMS
 # Optional, with the GitHub CLI: check the build provenance
 gh attestation verify doftar_v<version>_stable_macos.dmg --repo mhbsiam/doftar
 ```
+
+### Linux (preview)
+
+Doftar for Linux is a preview. It runs on Ubuntu 24.04 and later (x86_64).
+Most features work, but it has had less testing than the Mac app.
+[LINUX.md](https://github.com/mhbsiam/doftar/blob/linux/LINUX.md) lists what works and what is different.
+
+1. Download the `.deb` (or the `.AppImage`) from **Assets** on the
+   **[latest release](https://github.com/mhbsiam/doftar/releases/latest)**.
+2. Install the .deb. In the folder you saved it to, run `sudo apt install ./`
+   followed by its file name, for example:
+
+   ```sh
+   sudo apt install ./Doftar_1.0.3_amd64.deb
+   ```
+
+   Or make the AppImage executable and open it. The AppImage needs FUSE 2,
+   which Ubuntu 24.04 doesn't install by default:
+
+   ```sh
+   sudo apt install libfuse2t64
+   ```
+
+Please report problems in [Issues](https://github.com/mhbsiam/doftar/issues).
 
 ## Features
 

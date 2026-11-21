@@ -32,7 +32,7 @@
   "@type": "SoftwareApplication",
   "name": "Doftar",
   "description": "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.",
-  "operatingSystem": "macOS",
+  "operatingSystem": "macOS, Linux",
   "applicationCategory": "UtilitiesApplication",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://www.apache.org/licenses/LICENSE-2.0",
@@ -479,11 +479,12 @@
 <section class="block" id="faq">
   <h2>Before you download</h2>
   <div class="faq">
-    <details><summary>Is it safe?</summary><p>Doftar has no networking code, and a sandbox blocks its main process from the network. Scripts and installers ask before they run, and system folders can't be moved or deleted. The code is public, so anyone can check. <a href="https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md">How Doftar handles security</a></p></details>
+    <details><summary>Is it safe?</summary><p>Doftar has no networking code. On macOS, a sandbox also blocks its main process from the network. Scripts and installers ask before they run, and system folders can't be moved or deleted. The code is public, so anyone can check. <a href="https://github.com/mhbsiam/doftar/blob/main/.github/SECURITY.md">How Doftar handles security</a></p></details>
     <details><summary>Why does macOS warn me when I open it?</summary><p>Doftar isn't notarized yet. That needs a paid Apple Developer membership, which this free project doesn't have. You allow it once in System Settings, as the steps below show.</p></details>
     <details><summary>Is it really free?</summary><p>Yes. It's open source under Apache 2.0, with no account, ads or tracking.</p></details>
     <details><summary>Does it replace Finder?</summary><p>No. It runs next to Finder, and you can drag files between the two.</p></details>
     <details><summary>Which Macs does it run on?</summary><p>Apple silicon Macs (M1 and later) on macOS 13.1 Ventura or later. There is no Intel build.</p></details>
+    <details><summary>Is there a Linux version?</summary><p>Yes, as a preview. It runs on Ubuntu 24.04 and later (x86_64) and comes as a .deb and an AppImage. Most features work. Some Mac features, such as HEIC previews and dragging files out to other apps, are missing for now. <a href="https://github.com/mhbsiam/doftar/blob/linux/LINUX.md">What works on Linux</a></p></details>
     <details><summary>How do I update it?</summary><p>Doftar never goes online, so it doesn't check for updates. Download the new release and drag it onto the old one in Applications. Your settings stay.</p></details>
   </div>
 </section>
@@ -492,6 +493,7 @@
   <h2>Install in a minute</h2>
   <p>Doftar stays free by skipping Apple's $99 yearly notarization fee, so macOS asks you to allow it once. The <a href="https://github.com/mhbsiam/doftar">code is open</a> for anyone to check.</p>
   <a class="pill pill-light get" href="https://github.com/mhbsiam/doftar/releases/latest"><svg class="pi"><use href="#dl"/></svg> Download Doftar</a>
+  <p class="term"><b>On Linux?</b> A preview for Ubuntu 24.04+ is on the <a href="https://github.com/mhbsiam/doftar/releases/latest">release page</a> as a .deb and an AppImage. <a href="https://github.com/mhbsiam/doftar/blob/linux/LINUX.md">What works on Linux</a></p>
   <ol class="steps">
     <li><a href="assets/install/1-download.png"><img src="assets/install/1-download.png" width="548" height="450" loading="lazy" decoding="async" alt="A GitHub release page with doftar_v1.0.0_stable_macos.dmg highlighted under Assets"></a><strong><span class="n">1</span>Download the DMG</strong><p>Click the <b>.dmg</b> under Assets on the release page.</p></li>
     <li><a href="assets/install/2-drag.png"><img src="assets/install/2-drag.png" width="548" height="450" loading="lazy" decoding="async" alt="The Doftar disk image window: drag the Doftar icon onto the Applications folder"></a><strong><span class="n">2</span>Drag to Applications</strong><p>Open the DMG and drag Doftar onto the Applications folder.</p></li>
@@ -570,6 +572,7 @@
     <span>·</span> <a href="https://github.com/mhbsiam/doftar/blob/main/LICENSE">Apache 2.0</a>
   </p>
   <p>For Apple silicon Macs, macOS 13.1 and later
+    <span>·</span> Linux preview for Ubuntu 24.04+
     <span>·</span> <a href="changelog.html">What's new</a>
     <span>·</span> <a href="https://github.com/mhbsiam/doftar/issues/new/choose">Report a bug</a>
   </p>
