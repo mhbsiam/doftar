@@ -1,5 +1,30 @@
 # Changelog
 
+## Linux — unreleased
+
+The Linux port, based on the Mac app's 1.0.3. Fixes made while porting:
+
+- The image viewer's **Open in default app** works: the viewer window was
+  missing the `open_path` permission.
+- PDFs that use non-embedded standard fonts or CJK text render correctly:
+  the content security policy now allows the app's own cmaps and fonts.
+- Saving from the built-in editors keeps the file's tags (`user.*` xattrs)
+  and its times; the inode swap no longer drops them.
+- Copying refuses special files (FIFOs, devices) with a per-file error
+  instead of hanging the job; Cancel stays responsive.
+- A crafted GIF header can no longer abort the app — image decoding is
+  bounded, including the GIF branch the limits missed.
+- Empty Trash removes the `.trashinfo` sidecars too, including ones
+  orphaned earlier, and the locked-file recovery no longer shells out to
+  the macOS-only `chflags`.
+- "Open in Terminal" and tag search handle folders whose names are not
+  UTF-8; archives compress and extract them byte-exactly.
+- Eject, `xdg-mime`, `xdg-open` and D-Bus calls run under timeouts, and
+  every opened terminal is reaped instead of left as a zombie.
+- The Trash row's context menu no longer races the folder load at startup.
+- Help describes the Linux app, and REFERENCE.md's shortcut table matches
+  the shortcuts Linux ships.
+
 ## 1.0.3 — 2026-11-18
 
 - Split view opens and closes with a fold animation.

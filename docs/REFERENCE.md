@@ -94,20 +94,17 @@ layout is in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ### Details and info
 
-- **Properties**: size, size on disk, permissions, Finder tags, default app
+- **Properties**: size, size on disk, permissions, file tags, default app
 - Combined Properties for a multi-selection
 - **Copy as path**
 - **SHA-256, SHA-1 and MD5** checksums of a file in Properties, with a box to check one you pasted
-- **Media metadata**: duration, codec, resolution and camera columns, rename tokens, and a shot list export
-- **Share**: Quick Look, the macOS Share menu (AirDrop, Mail, Messages) and Open With
-- **Help → Copy Diagnostic Info** copies the latest errors from `~/Library/Logs/Doftar/crash.log`, with your home folder shortened to `~`
+- **Help → Copy Diagnostic Info** copies the latest errors from `~/.local/state/Doftar/crash.log`, with your home folder shortened to `~`
 
 ### Tools
 
 - **Disk usage**: a treemap of what fills your disk, folder by folder, plus developer folders, AI model caches, the largest files and **duplicate files**, with CSV export
 - **Git**: status badges on changed files, and a page listing every repository with its history
 - **Agent skills**: every `SKILL.md` across your coding agents and `~/.agents/skills`, with symlinked copies recognized as one. The page is listed only when one of those folders exists
-- **App uninstaller**: finds what an app leaves behind in `~/Library` and removes it with the app
 
 ### Look and accessibility
 
@@ -115,7 +112,6 @@ layout is in [ARCHITECTURE.md](ARCHITECTURE.md).
 - Adjustable text size, folder colors, date format and 12- or 24-hour clock
 - Keyboard-first file list with type-ahead; right-click menus show shortcuts and jump to an item by its first letter
 - WCAG 2.1 AA contrast and reduced-motion support
-- 120 Hz animation on ProMotion displays
 
 ## Keyboard shortcuts
 
@@ -130,13 +126,13 @@ Mac keys first; the Windows-style keys in the right column also work.
 | Undo / Redo | `⌘Z` / `⇧⌘Z` | `Ctrl + Z / Shift + Z` |
 | Select all | `⌘A` | `Ctrl + A` |
 | Select by pattern / Invert selection | `⌘⇧S` / `⌘⇧I` | |
-| Quick Look (tap to toggle, hold to peek) | `Space` | |
+| Preview in the built-in viewer (Space never launches a foreign app) | `Space` | `Space` |
 | Move to Trash | `⌘⌫` | `Delete` |
 | Delete immediately | `⌘⌥⌫` | `Shift + Delete` |
 | New folder / text document | `⌘⇧N` / `⌘⌥N` | `Ctrl + Shift + N` / `Ctrl + Alt + N` |
-| New folder with selection | `⌃⌘N` | |
+| New folder with selection | `⌃⌥⇧N` | `Ctrl + Alt + Shift + N` |
 | Duplicate | `⌘D` | `Ctrl + D` |
-| Reveal in Finder | `⌥⌘R` | |
+| Reveal in File Manager | `⌥⌘R` | `Ctrl + Alt + R` |
 | New window | `⌘N` | `Ctrl + N` |
 | New tab / close tab | `⌘T` / `⌘W` | `Ctrl + T / W` |
 | Reopen closed tab | `⌘⇧T` | `Ctrl + Shift + T` |

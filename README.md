@@ -72,6 +72,11 @@ shasum -a 256 -c SHA256SUMS
 gh attestation verify doftar_v<version>_stable_macos.dmg --repo mhbsiam/doftar
 ```
 
+### Linux (preview)
+
+A Linux port for Ubuntu 24.04+ lives on this `linux` branch. It isn't released yet.
+[LINUX.md](LINUX.md) explains how to build it, what works and what differs from the Mac app.
+
 ## Features
 
 ### Layout and navigation
