@@ -1,6 +1,8 @@
 use tauri::menu::{
-    AboutMetadata, Menu, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu, SubmenuBuilder,
+    AboutMetadata, Menu, MenuItem, MenuItemKind, Submenu, SubmenuBuilder,
 };
+#[cfg(target_os = "macos")]
+use tauri::menu::PredefinedMenuItem;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 fn item<R: Runtime>(
@@ -23,29 +25,35 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let app_menu = SubmenuBuilder::new(app, &pkg.name)
         .about(Some(about))
         .separator()
-        .item(&item(app, "settings", "Settings…", Some("CmdOrCtrl+Comma"))?)
+        .item(&item(app, "settings", "Settings…", Some("CmdOrCtrl+Comma"))?);
+    // Services, Hide and Show All are macOS menu conventions.
+    #[cfg(target_os = "macos")]
+    let app_menu = app_menu
         .separator()
         .services()
         .separator()
         .hide()
         .hide_others()
-        .show_all()
-        .separator()
-        .quit()
-        .build()?;
+        .show_all();
+    let app_menu = app_menu.separator().quit().build()?;
 
     let file = SubmenuBuilder::with_id(app, "file", "File")
         .item(&item(app, "new_window", "New Window", Some("CmdOrCtrl+N"))?)
         .item(&item(app, "new_tab", "New Tab", Some("CmdOrCtrl+T"))?)
         .item(&item(app, "new_folder", "New Folder", Some("CmdOrCtrl+Shift+N"))?)
-        .item(&item(app, "new_folder_selection", "New Folder with Selection", Some("Control+Command+N"))?)
+        .item(&item(app, "new_folder_selection", "New Folder with Selection", Some("Ctrl+Alt+Shift+N"))?)
         .item(&item(app, "new_file", "New Text Document", Some("CmdOrCtrl+Alt+N"))?)
         .separator()
         .item(&item(app, "open", "Open", Some("CmdOrCtrl+Down"))?)
         .item(&item(app, "get_info", "Properties", Some("CmdOrCtrl+I"))?)
         .item(&item(app, "rename", "Rename", None)?)
         .item(&item(app, "duplicate", "Duplicate", Some("CmdOrCtrl+D"))?)
-        .item(&item(app, "reveal_in_finder", "Reveal in Finder", Some("CmdOrCtrl+Alt+R"))?)
+        .item(&item(
+            app,
+            "reveal_in_finder",
+            if cfg!(target_os = "macos") { "Reveal in Finder" } else { "Reveal in File Manager" },
+            Some("CmdOrCtrl+Alt+R"),
+        )?)
         .item(&item(app, "open_terminal", "Open in Terminal", Some("CmdOrCtrl+Alt+T"))?)
         .item(&item(app, "move_to", "Move to…", None)?)
         .item(&item(app, "copy_to", "Copy to…", None)?)
@@ -120,10 +128,12 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         .item(&item(app, "next_tab", "Show Next Tab", Some("CmdOrCtrl+Shift+BracketRight"))?)
         .item(&item(app, "prev_tab", "Show Previous Tab", Some("CmdOrCtrl+Shift+BracketLeft"))?)
         .separator()
-        .item(&item(app, "close_window", "Close Window", Some("CmdOrCtrl+Shift+W"))?)
+        .item(&item(app, "close_window", "Close Window", Some("CmdOrCtrl+Shift+W"))?);
+    #[cfg(target_os = "macos")]
+    let window = window
         .separator()
-        .item(&PredefinedMenuItem::bring_all_to_front(app, None)?)
-        .build()?;
+        .item(&PredefinedMenuItem::bring_all_to_front(app, None)?);
+    let window = window.build()?;
 
     let help = SubmenuBuilder::new(app, "Help")
         .item(&item(app, "help", "Doftar Help", Some("CmdOrCtrl+Shift+Slash"))?)
@@ -161,6 +171,10 @@ pub fn on_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
         "close_window" => {
             let _ = win.close();
         }
+        // On macOS the pasteboard must be written at menu time: WebKit refuses a copy
+        // from a page without a click in that page (see crashlog.rs). The page then only
+        // shows a toast, and viewer windows have no toasts, so the main window reports.
+        #[cfg(target_os = "macos")]
         "copy_diagnostics" => {
             let result = if crate::crashlog::copy_diagnostics().is_ok() {
                 "diagnostics_copied"
@@ -170,6 +184,14 @@ pub fn on_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
             // Viewer windows have no toasts, so the main window reports for them.
             if let Some(w) = file_window(app, win) {
                 let _ = w.emit_to(w.label(), "menu", result.to_string());
+            }
+        }
+        // On Linux the page writes the clipboard itself (actions.copyDiagnostics), and
+        // viewer windows have no menu listener, so the main window runs it and reports.
+        #[cfg(not(target_os = "macos"))]
+        "copy_diagnostics" => {
+            if let Some(w) = file_window(app, win) {
+                let _ = w.emit_to(w.label(), "menu", id.to_string());
             }
         }
         "settings" => {

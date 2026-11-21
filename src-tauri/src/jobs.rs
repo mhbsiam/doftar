@@ -109,12 +109,12 @@ pub enum Step {
 
 impl Step {
     pub fn moved(from: String, to: String) -> Step {
-        let id = file_id(Path::new(&from));
+        let id = file_id(&(crate::paths::real(&from)));
         Step::Move { from, to, id }
     }
 
     pub fn trash(path: String) -> Step {
-        let id = file_id(Path::new(&path));
+        let id = file_id(&(crate::paths::real(&path)));
         Step::Trash { path, id }
     }
 }
@@ -136,17 +136,24 @@ pub fn revision(m: &std::fs::Metadata) -> String {
 
 /// Cancel all jobs and wait up to `limit` for them to stop at a safe point. Returns true if any ran.
 pub fn stop_all(limit: Duration) -> bool {
-    let reg = registry().locked();
-    let any = !reg.is_empty();
-    for job in reg.values() {
-        job.cancel.store(true, Ordering::Relaxed);
-    }
-    drop(reg);
+    // Jobs can register while earlier ones wind down, so cancel every pass,
+    // not just the first. Otherwise a late job runs until the deadline and
+    // exit(0) kills it mid-write, leaving .wf-partial-* behind.
+    let mut any = false;
     let until = Instant::now() + limit;
-    while !registry().locked().is_empty() && Instant::now() < until {
+    loop {
+        let reg = registry().locked();
+        let empty = reg.is_empty();
+        any |= !empty;
+        for job in reg.values() {
+            job.cancel.store(true, Ordering::Relaxed);
+        }
+        drop(reg);
+        if empty || Instant::now() >= until {
+            return any;
+        }
         std::thread::sleep(Duration::from_millis(50));
     }
-    any
 }
 
 #[derive(Serialize, Default, Debug)]
@@ -424,7 +431,7 @@ pub fn start_scan(job: &JobGuard, paths: Vec<String>, space_on: Option<&Path>) {
         let dest_dev = dest.as_deref().and_then(dev);
         let mut incoming = 0u64;
         for p in &paths {
-            let n = tree_bytes(&job, Path::new(p));
+            let n = tree_bytes(&job, &(crate::paths::real(p)));
             job.bytes_total.fetch_add(n, Ordering::Relaxed);
             if dest_dev.is_some() && std::fs::symlink_metadata(p).ok().map(|m| m.dev()) != dest_dev {
                 incoming = incoming.saturating_add(n);

@@ -72,7 +72,7 @@ fn media_info_of(path: &str) -> Option<MediaInfo> {
         })
         .map(|d| spotlight_media(&d))
         .unwrap_or_default();
-    let ext = std::path::Path::new(path).extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase());
+    let ext = crate::paths::real(path).extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase());
     if ext.is_some_and(|e| VIDEO_EXTS.contains(&e.as_str())) {
         // Spotlight never records the frame rate and knows nothing on an unindexed card or RAID. The video track fills the gaps.
         if let Some((secs, fps, w, h)) = mac::video_track(path) {

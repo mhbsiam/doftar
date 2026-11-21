@@ -109,7 +109,7 @@ pub fn info(dir: &Path) -> Option<GitInfo> {
             // The folder is untracked, so all its unignored contents are untracked.
             for child in std::fs::read_dir(&dir).ok()?.flatten() {
                 let Some(name) = child.file_name().to_str().map(str::to_string) else { continue };
-                if !repo.status_should_ignore(Path::new(&format!("{prefix}{name}"))).unwrap_or(false) {
+                if !repo.status_should_ignore(&(crate::paths::real(&format!("{prefix}{name}")))).unwrap_or(false) {
                     files.insert(name, "untracked");
                 }
             }
@@ -143,7 +143,7 @@ pub fn info(dir: &Path) -> Option<GitInfo> {
 
 #[tauri::command]
 pub async fn git_info(path: String) -> Result<Option<GitInfo>, String> {
-    jobs::blocking(move || info(Path::new(&path))).await
+    jobs::blocking(move || info(&(crate::paths::real(&path)))).await
 }
 
 #[derive(Serialize, Debug)]
@@ -298,7 +298,7 @@ pub fn overview(dir: &Path) -> Option<Overview> {
 
 #[tauri::command]
 pub async fn git_overview(path: String) -> Result<Option<Overview>, String> {
-    jobs::blocking(move || overview(Path::new(&path))).await
+    jobs::blocking(move || overview(&(crate::paths::real(&path)))).await
 }
 
 #[derive(Serialize, Debug)]
@@ -358,7 +358,7 @@ pub fn worktree_status(dir: &Path) -> Option<WorktreeStatus> {
 
 #[tauri::command]
 pub async fn git_worktree_status(path: String) -> Result<Option<WorktreeStatus>, String> {
-    jobs::blocking(move || worktree_status(Path::new(&path))).await
+    jobs::blocking(move || worktree_status(&(crate::paths::real(&path)))).await
 }
 
 /// Check out local branch `name`. Refuse if uncommitted edits would be overwritten.
@@ -411,7 +411,7 @@ pub fn switch(dir: &Path, name: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn git_switch(path: String, branch: String) -> Result<(), String> {
-    jobs::blocking(move || switch(Path::new(&path), &branch)).await?
+    jobs::blocking(move || switch(&(crate::paths::real(&path)), &branch)).await?
 }
 
 #[derive(Serialize, Debug)]
@@ -445,7 +445,7 @@ fn find_repos(dir: &Path, depth: usize, out: &mut Vec<std::path::PathBuf>) {
         let name = name.to_string_lossy();
         // `file_type` does not follow symlinks. Links cannot loop the walk.
         let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
-        let bundle = Path::new(&*name).extension().is_some_and(|x| BUNDLES.contains(&&*x.to_string_lossy()));
+        let bundle = crate::paths::real(&*name).extension().is_some_and(|x| BUNDLES.contains(&&*x.to_string_lossy()));
         if !is_dir || name.starts_with('.') || bundle || SKIP.contains(&&*name) {
             continue;
         }
@@ -703,9 +703,9 @@ mod tests {
         // `other` tracks files that are untracked or ignored on main.
         fs::write(base.join("b.txt"), "theirs").unwrap();
         let mut index = repo.index().unwrap();
-        index.add_path(Path::new("b.txt")).unwrap();
+        index.add_path(&(crate::paths::real("b.txt"))).unwrap();
         fs::write(base.join("secret.env"), "theirs").unwrap();
-        index.add_path(Path::new("secret.env")).unwrap();
+        index.add_path(&(crate::paths::real("secret.env"))).unwrap();
         index.write().unwrap();
         let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
         let sig = git2::Signature::now("t", "t@example.com").unwrap();
@@ -726,7 +726,7 @@ mod tests {
         repo.set_head_detached(head.id()).unwrap();
         fs::write(base.join("a.txt"), "loose").unwrap();
         let mut index = repo.index().unwrap();
-        index.add_path(Path::new("a.txt")).unwrap();
+        index.add_path(&(crate::paths::real("a.txt"))).unwrap();
         index.write().unwrap();
         let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
         let loose = repo.commit(Some("HEAD"), &sig, &sig, "loose", &tree, &[&head]).unwrap();

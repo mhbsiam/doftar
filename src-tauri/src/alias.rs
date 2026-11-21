@@ -80,10 +80,10 @@ fn make_one(_original: &Path) -> Result<String, String> {
 pub fn make_aliases(paths: Vec<String>) -> OpResult {
     let mut res = OpResult::default();
     for p in &paths {
-        let original = Path::new(p);
-        match make_one(original) {
+        let original = crate::paths::real(p);
+        match make_one(&(original)) {
             Ok(alias) => res.inverse.push(Step::trash(alias)),
-            Err(e) => res.errors.push(format!("\"{}\": {e}", label(original))),
+            Err(e) => res.errors.push(format!("\"{}\": {e}", label(&(original)))),
         }
     }
     res
@@ -107,9 +107,9 @@ pub fn resolve_alias(path: String) -> Result<AliasTarget, String> {
             &url,
             NSURLBookmarkResolutionOptions::WithoutUI,
         )
-        .map_err(|_| format!("The original of \"{}\" can't be found", label(Path::new(&path))))?;
+        .map_err(|_| format!("The original of \"{}\" can't be found", label(crate::paths::real(&path))))?;
         let p = target.path().map(|s| s.to_string()).ok_or("the alias has no target")?;
-        let target = Path::new(&p);
+        let target = crate::paths::real(&p);
         let ext = target
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
@@ -158,7 +158,7 @@ mod tests {
             ]
         );
         for p in &made {
-            assert!(is_alias_file(Path::new(p)), "{p} should be flagged as an alias");
+            assert!(is_alias_file(crate::paths::real(p)), "{p} should be flagged as an alias");
         }
         assert!(!is_alias_file(&base.join("note.txt")));
 

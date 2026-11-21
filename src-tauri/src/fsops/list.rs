@@ -110,7 +110,7 @@ pub async fn list_dir(path: String, show_hidden: bool) -> Result<Vec<FileEntry>,
 }
 
 pub(crate) fn list_dir_sync(path: &str, show_hidden: bool) -> Result<Vec<FileEntry>, String> {
-    let dir = Path::new(path);
+    let dir = crate::paths::real(path);
     // `None` means use the per-entry path. That path also gives the error for unreadable folders.
     #[cfg(target_os = "macos")]
     let bulk = crate::bulk::list_dir(dir, show_hidden);
@@ -140,10 +140,10 @@ pub fn stat_entries(paths: Vec<String>) -> Vec<FileEntry> {
     paths
         .iter()
         .filter_map(|p| {
-            let path = Path::new(p);
-            let meta = fs::symlink_metadata(path).ok()?;
+            let path = crate::paths::real(p);
+            let meta = fs::symlink_metadata(&path).ok()?;
             let name = path.file_name()?.to_string_lossy().to_string();
-            build_entry(path, name, meta, true)
+            build_entry(&(path), name, meta, true)
         })
         .collect()
 }
@@ -165,12 +165,19 @@ pub struct SystemInfo {
     home: String,
     boot_volume_name: String,
     volumes: Vec<VolumeInfo>,
+    /// The real Trash folder, honoring `$XDG_DATA_HOME`. Null when it cannot be resolved.
+    trash_dir: Option<String>,
 }
 
 pub(super) fn is_network_fs(fs_type: &str) -> bool {
-    matches!(fs_type, "smbfs" | "afpfs" | "nfs" | "webdav" | "cifs" | "ftp")
+    matches!(
+        fs_type,
+        "smbfs" | "afpfs" | "nfs" | "nfs4" | "webdav" | "cifs" | "smb3" | "ftp" | "ceph"
+            | "gfs2" | "ocfs2" | "afs" | "davfs2" | "sshfs"
+    ) || fs_type.starts_with("fuse.sshfs")
 }
 
+#[cfg(target_os = "macos")]
 pub(crate) fn is_network_volume(path: &str) -> bool {
     let Ok(c) = std::ffi::CString::new(path) else { return false };
     let mut st: libc::statfs = unsafe { std::mem::zeroed() };
@@ -180,6 +187,140 @@ pub(crate) fn is_network_volume(path: &str) -> bool {
     }
     let ty: Vec<u8> = st.f_fstypename.iter().take_while(|&&b| b != 0).map(|&b| b as u8).collect();
     is_network_fs(&String::from_utf8_lossy(&ty)) || st.f_flags & (libc::MNT_LOCAL as u32) == 0
+}
+
+/// The mount table, one line per string. Read as bytes and lossied per line: procfs
+/// passes a non-UTF-8 mount point's raw bytes through, and a single such mount must
+/// not blank out the whole table.
+#[cfg(not(target_os = "macos"))]
+fn mount_table() -> Vec<String> {
+    fs::read("/proc/self/mounts")
+        .map(|bytes| {
+            bytes
+                .split(|&b| b == b'\n')
+                .map(|line| String::from_utf8_lossy(line).into_owned())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The fstype of the mount that holds `path`, from `/proc/self/mounts`.
+/// Linux `statfs` gives only a magic number; the mount table has the name.
+#[cfg(not(target_os = "macos"))]
+fn fstype_of(path: &str) -> Option<String> {
+    let mounts = mount_table();
+    let path = path.trim_end_matches('/');
+    let path = if path.is_empty() { "/" } else { path };
+    let mut best: Option<(usize, String)> = None;
+    for line in &mounts {
+        let mut f = line.split_whitespace();
+        let (Some(_src), Some(mp), Some(ty)) = (f.next(), f.next(), f.next()) else {
+            continue;
+        };
+        let mp = mp.replace("\\040", " ");
+        let on = path == mp || path.starts_with(&format!("{mp}/")) || mp == "/";
+        if on && best.as_ref().is_none_or(|(n, _)| mp.len() > *n) {
+            best = Some((mp.len(), ty.to_string()));
+        }
+    }
+    best.map(|(_, ty)| ty)
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn is_network_volume(path: &str) -> bool {
+    fstype_of(path).is_some_and(|ty| is_network_fs(&ty))
+}
+
+/// Filesystems that are kernel or container plumbing, not places a user keeps files.
+#[cfg(not(target_os = "macos"))]
+const PSEUDO_FS: &[&str] = &[
+    "proc", "sysfs", "devtmpfs", "devpts", "tmpfs", "mqueue", "hugetlbfs", "ramfs",
+    "securityfs", "debugfs", "tracefs", "configfs", "pstore", "bpf", "cgroup", "cgroup2",
+    "fusectl", "nsfs", "autofs", "binfmt_misc", "efivarfs", "rpc_pipefs", "selinuxfs",
+    "overlay", "squashfs",
+];
+
+/// Every mount point in `/proc/self/mounts`, kernel plumbing included. cache.rs matches
+/// session folders against these devices: a tmpfs is still a mounted device, and a
+/// missing entry would delete live previews. Volumes listing parses its own table, with
+/// stricter filters than this.
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn mount_points() -> Vec<PathBuf> {
+    parse_mounts(&mount_table(), true)
+}
+
+/// Mount points of a mount table, plumbing excluded unless asked for.
+#[cfg(not(target_os = "macos"))]
+fn parse_mounts(table: &[String], everything: bool) -> Vec<PathBuf> {
+    table
+        .iter()
+        .filter_map(|line| {
+            let mut f = line.split_whitespace();
+            let (_src, mp, ty) = (f.next()?, f.next()?, f.next()?);
+            (everything || !PSEUDO_FS.contains(&ty)).then(|| unescape_field(mp))
+        })
+        .map(|mp| crate::paths::real(&mp))
+        .collect()
+}
+
+/// The octal escapes procfs puts in a mount table field: space, tab and backslash.
+#[cfg(not(target_os = "macos"))]
+fn unescape_field(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'\\' && i + 4 <= b.len() {
+            let unescaped = match &s[i + 1..i + 4] {
+                "040" => Some(b' '),
+                "011" => Some(b'\t'),
+                "134" => Some(b'\\'),
+                _ => None,
+            };
+            if let Some(byte) = unescaped {
+                out.push(byte);
+                i += 4;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_mount_points_and_skips_pseudo_filesystems() {
+        let table = "\
+/dev/nvme0n1p2 / ext4 rw,relatime 0 0
+/dev/sda1 /mnt/usb\\040drive vfat rw 0 0
+proc /proc proc rw 0 0
+tmpfs /run tmpfs rw,nosuid 0 0
+/dev/sdb1 /run/media/user/My\\040Disk ext4 rw 0 0
+overlay /var/lib/docker/overlay2 overlay rw 0 0
+/dev/loop0 /snap/core squashfs ro 0 0
+/dev/sdc1 /mnt/tab\\011sep ext4 rw 0 0
+";
+        let table: Vec<String> = table.lines().map(String::from).collect();
+        let pts = parse_mounts(&table, false);
+        assert!(pts.contains(&crate::paths::real("/")));
+        assert!(pts.contains(&crate::paths::real("/mnt/usb drive")));
+        assert!(pts.contains(&crate::paths::real("/run/media/user/My Disk")));
+        assert!(pts.contains(&crate::paths::real("/mnt/tab\tsep")));
+        assert_eq!(pts.len(), 4, "proc, tmpfs, overlay and squashfs are not user volumes");
+        let all = parse_mounts(&table, true);
+        assert_eq!(all.len(), 8, "the plumbing counts as mounted too");
+        assert!(all.contains(&crate::paths::real("/snap/core")));
+    }
+
+    #[test]
+    fn the_mount_table_has_the_root_filesystem() {
+        assert!(mount_points().iter().any(|p| *p == crate::paths::real("/")));
+    }
 }
 
 pub(super) fn push_volume(v: &mut Vec<VolumeInfo>, path: &str, name: &str, ejectable: bool) {
@@ -200,19 +341,18 @@ pub(super) const SYSTEM_VOLUME_NAMES: [&str; 4] = ["Recovery", "Preboot", "VM", 
 /// Bytes free on the volume that holds `path`.
 #[tauri::command(async)]
 pub fn free_space(path: String) -> Option<u64> {
-    fs2::available_space(&path).ok()
+    fs2::available_space(crate::paths::real(&path)).ok()
 }
 
-#[tauri::command(async)]
-pub fn system_info() -> SystemInfo {
-    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
-    let root_dev = fs::metadata("/").map(|m| m.dev()).unwrap_or(0);
+#[cfg(target_os = "macos")]
+fn volumes(home: &std::path::Path, root_dev: u64) -> (String, Vec<VolumeInfo>) {
+    let _ = home;
     let mut root_name = "Macintosh HD".to_string();
     let mut volumes = Vec::new();
     if let Ok(rd) = fs::read_dir("/Volumes") {
         for item in rd.flatten() {
             let p = item.path();
-            let is_boot = fs::read_link(&p).is_ok_and(|t| t == Path::new("/"))
+            let is_boot = fs::read_link(&p).is_ok_and(|t| t == crate::paths::real("/"))
                 || fs::metadata(&p).is_ok_and(|m| m.dev() == root_dev);
             if is_boot {
                 root_name = item.file_name().to_string_lossy().to_string();
@@ -225,34 +365,78 @@ pub fn system_info() -> SystemInfo {
             {
                 continue;
             }
-            push_volume(&mut volumes, &p.to_string_lossy(), &name, true);
+            push_volume(&mut volumes, &crate::paths::encode(&p), &name, true);
         }
     }
+    (root_name, volumes)
+}
+
+/// Mount points worth showing as volumes: block devices under /media, /run/media or /mnt.
+/// Users see removable drives and extra mounts. Snap loop mounts and pseudo filesystems stay out.
+#[cfg(not(target_os = "macos"))]
+fn volumes(_home: &std::path::Path, root_dev: u64) -> (String, Vec<VolumeInfo>) {
+    let mut volumes = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let mounts = mount_table();
+    for line in &mounts {
+        let mut f = line.split_whitespace();
+        let (Some(src), Some(mp), Some(ty)) = (f.next(), f.next(), f.next()) else {
+            continue;
+        };
+        if !src.starts_with("/dev/") || ty == "squashfs" {
+            continue;
+        }
+        let mp = mp.replace("\\040", " ").replace("\\011", "\t");
+        let under_media = mp.starts_with("/media/") || mp.starts_with("/run/media/");
+        let boot = mp == "/boot" || mp.starts_with("/boot/");
+        if !(under_media || mp.starts_with("/mnt/") || boot) {
+            continue;
+        }
+        if !seen.insert(mp.clone()) {
+            continue;
+        }
+        if fs::metadata(&mp).is_ok_and(|m| m.dev() == root_dev) {
+            continue;
+        }
+        let name = mp.rsplit('/').next().unwrap_or(&mp).to_string();
+        push_volume(&mut volumes, &mp, &name, under_media);
+    }
+    ("System".to_string(), volumes)
+}
+
+#[tauri::command(async)]
+pub fn system_info() -> SystemInfo {
+    let home = dirs::home_dir().unwrap_or_else(|| crate::paths::real("/"));
+    let root_dev = fs::metadata("/").map(|m| m.dev()).unwrap_or(0);
+    let (root_name, volumes) = volumes(&home, root_dev);
     let mut all = Vec::with_capacity(volumes.len() + 1);
     push_volume(&mut all, "/", &root_name, false);
     all.extend(volumes);
     SystemInfo {
-        home: home.to_string_lossy().to_string(),
+        home: crate::paths::encode(&home),
         boot_volume_name: root_name,
         volumes: all,
+        trash_dir: crate::trash::user_trash()
+            .ok()
+            .map(|t| crate::paths::encode(&t)),
     }
 }
 
 #[tauri::command(async)]
 pub fn path_exists(path: String) -> bool {
     // Do not follow symlinks. A dangling link is still an item.
-    exists(Path::new(&path))
+    exists(&(crate::paths::real(&path)))
 }
 
 #[tauri::command(async)]
 pub fn is_folder(path: String) -> bool {
-    fs::metadata(&path).is_ok_and(|m| m.is_dir())
+    fs::metadata(crate::paths::real(&path)).is_ok_and(|m| m.is_dir())
 }
 
 /// Returns the folder modification time. It changes when an item is added, removed or renamed.
 #[tauri::command(async)]
 pub fn dir_stamp(path: String) -> Option<String> {
-    let modified = fs::metadata(&path).ok()?.modified().ok()?;
+    let modified = fs::metadata(crate::paths::real(&path)).ok()?.modified().ok()?;
     let d = modified.duration_since(UNIX_EPOCH).ok()?;
     Some(format!("{}.{:09}", d.as_secs(), d.subsec_nanos()))
 }
@@ -262,19 +446,19 @@ pub fn dir_stamp(path: String) -> Option<String> {
 pub fn file_ids(paths: Vec<String>) -> Vec<Option<String>> {
     paths
         .iter()
-        .map(|p| fs::metadata(p).ok().map(|m| file_id_of(&m)))
+        .map(|p| fs::metadata(crate::paths::real(p)).ok().map(|m| file_id_of(&m)))
         .collect()
 }
 
 /// Ids of the items themselves, not of link targets. Undo steps record them.
 #[tauri::command(async)]
 pub fn item_ids(paths: Vec<String>) -> Vec<Option<String>> {
-    paths.iter().map(|p| jobs::file_id(Path::new(p))).collect()
+    paths.iter().map(|p| jobs::file_id(&(crate::paths::real(p)))).collect()
 }
 
 /// See `jobs::revision`. The editor sends it back with its save.
 #[tauri::command(async)]
 pub fn file_revision(path: String) -> Option<String> {
-    fs::metadata(&path).ok().map(|m| jobs::revision(&m))
+    fs::metadata(crate::paths::real(&path)).ok().map(|m| jobs::revision(&m))
 }
 

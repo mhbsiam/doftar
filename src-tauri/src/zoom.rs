@@ -1,4 +1,5 @@
-//! Zoom animation for viewer windows. AppKit animates the window frame, so it is smooth when the page is busy.
+//! Zoom animation for viewer windows. The window frame animates (AppKit on macOS, a stepped glide
+//! on Linux), so it is smooth when the page is busy.
 //! "Reduce motion" turns it off. An image opened from a listing uses `fly` instead.
 
 use std::sync::OnceLock;
@@ -196,6 +197,68 @@ pub(crate) mod mac {
     }
 }
 
+/// Window motion on Linux: there is no AppKit animator, so the glide steps the frame along the
+/// GTK main loop. Wayland keeps window placement to the compositor, so there a glide resizes only.
+#[cfg(not(target_os = "macos"))]
+pub(crate) mod linux {
+    use std::time::{Duration, Instant};
+
+    use gtk::gdk;
+    use gtk::glib::{self, ControlFlow};
+    use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow};
+
+    use super::{slow, GLIDE};
+
+    /// The step interval of a glide, about one frame at 60 Hz.
+    const FRAME: Duration = Duration::from_millis(16);
+
+    /// True when GTK opened a Wayland display, where apps cannot place windows. Split view then
+    /// narrows the pane instead of growing the window (`openSplit` in tabs.ts asks before it grows).
+    pub fn cannot_place() -> bool {
+        gdk::DisplayManager::get()
+            .default_display()
+            .is_some_and(|d| d.name().starts_with("wayland"))
+    }
+
+    /// Steps `win` from its current frame to `pos` + `size` over GLIDE, easing both ends like the
+    /// AppKit glide. True when the glide started. Call on the main thread.
+    pub fn glide(win: &WebviewWindow, pos: PhysicalPosition<i32>, size: PhysicalSize<u32>) -> bool {
+        let (Ok(from_pos), Ok(from_size)) = (win.outer_position(), win.outer_size()) else {
+            return false;
+        };
+        if (from_pos, from_size) == (pos, size) {
+            return false;
+        }
+        let win = win.clone();
+        let over = slow(GLIDE);
+        let started = Instant::now();
+        glib::timeout_add_local(FRAME, move || {
+            let t = (started.elapsed().as_secs_f64() / over.as_secs_f64()).min(1.0);
+            // Smoothstep: slow at both ends, like kCAMediaTimingFunctionEaseInEaseOut.
+            let e = t * t * (3.0 - 2.0 * t);
+            let move_to = |f: i32, to: i32| f + ((to - f) as f64 * e).round() as i32;
+            let grow_to = |f: u32, to: u32| (f as f64 + (to as f64 - f as f64) * e).round() as u32;
+            let _ = win.set_position(PhysicalPosition::new(
+                move_to(from_pos.x, pos.x),
+                move_to(from_pos.y, pos.y),
+            ));
+            let _ = win.set_size(PhysicalSize::new(
+                grow_to(from_size.width, size.width),
+                grow_to(from_size.height, size.height),
+            ));
+            if t >= 1.0 {
+                // Land exactly on the asked frame; the eased step can round a pixel off.
+                let _ = win.set_position(pos);
+                let _ = win.set_size(size);
+                ControlFlow::Break
+            } else {
+                ControlFlow::Continue
+            }
+        });
+        true
+    }
+}
+
 pub fn reduce_motion() -> bool {
     #[cfg(target_os = "macos")]
     return mac::reduce_motion();
@@ -228,6 +291,10 @@ pub fn set_frame(
         {
             return Ok(());
         }
+    }
+    #[cfg(not(target_os = "macos"))]
+    if !reduce_motion() && linux::glide(win, pos, size) {
+        return Ok(());
     }
     win.set_position(pos)?;
     win.set_size(size)

@@ -66,7 +66,7 @@ pub fn share_paths(
 ) -> Result<(), String> {
     let paths: Vec<String> = paths
         .into_iter()
-        .filter(|p| p.starts_with('/') && Path::new(p).exists())
+        .filter(|p| p.starts_with('/') && crate::paths::real(p).exists())
         .collect();
     if paths.is_empty() {
         return Err("nothing to share".into());

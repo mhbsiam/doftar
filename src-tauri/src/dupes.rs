@@ -135,7 +135,7 @@ pub async fn find_duplicates(
 ) -> Result<DupeReport, String> {
     jobs::blocking(move || {
         let job = jobs::begin(job_id, on_progress);
-        find(Path::new(&root), min_size, &job)
+        find(&(crate::paths::real(&root)), min_size, &job)
     })
     .await
 }

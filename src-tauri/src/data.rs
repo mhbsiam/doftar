@@ -146,8 +146,8 @@ pub async fn read_data_part(window: tauri::Window, path: String, part: String) -
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    crate::reader::check_granted(window.label(), Path::new(&path))?;
-    crate::jobs::blocking(move || read_part(Path::new(&path), &part)).await?
+    crate::reader::check_granted(window.label(), &(crate::paths::real(&path)))?;
+    crate::jobs::blocking(move || read_part(&(crate::paths::real(&path)), &part)).await?
 }
 
 pub fn thousands(n: u64) -> String {
@@ -926,7 +926,8 @@ pub fn float(v: f64) -> String {
         return format!("{v:.1}");
     }
     let s = format!("{v:.6}");
-    s.trim_end_matches('0').to_string()
+    // Integral magnitudes at or past 1e15 keep no decimals, so the dot must go too.
+    s.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
 fn column_values(frame: &hdf5::Group, name: &str, n: usize) -> Option<Vec<Option<String>>> {

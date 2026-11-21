@@ -17,7 +17,16 @@ const CRASH_REPORTS_SHOWN: usize = 5;
 const ENTRY_MARK: &str = "=== ";
 
 fn log_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join("Library/Logs/Doftar/crash.log"))
+    #[cfg(target_os = "macos")]
+    {
+        dirs::home_dir().map(|home| home.join("Library/Logs/Doftar/crash.log"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        dirs::state_dir()
+            .or_else(dirs::data_local_dir)
+            .map(|dir| dir.join("Doftar/crash.log"))
+    }
 }
 
 /// Call early in `main`. Panics before this print to stderr only.
@@ -96,16 +105,24 @@ fn recent_entries(log: &str) -> &str {
     &log[start..]
 }
 
-fn macos_version() -> String {
-    Command::new("/usr/bin/sw_vers")
-        .arg("-productVersion")
-        .output()
+fn os_version() -> String {
+    #[cfg(target_os = "macos")]
+    let raw = Command::new("/usr/bin/sw_vers").arg("-productVersion").output();
+    #[cfg(not(target_os = "macos"))]
+    let raw = Command::new("uname").arg("-srm").output();
+    let v = raw
         .ok()
         .filter(|out| out.status.success())
-        .map_or_else(|| "unknown".to_string(), |out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .map_or_else(|| "unknown".to_string(), |out| String::from_utf8_lossy(&out.stdout).trim().to_string());
+    if cfg!(target_os = "macos") && v != "unknown" {
+        format!("macOS {v}")
+    } else {
+        v
+    }
 }
 
 /// Reports macOS itself wrote for crashes a panic hook cannot see, such as a segfault in native code.
+#[cfg(any(target_os = "macos", test))]
 fn crash_reports(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(dir)
         .map(|rd| {
@@ -127,7 +144,7 @@ fn report(macos: &str, reports: &[String], log: &str, home: Option<&str>) -> Str
     let recent = recent_entries(log).trim();
     let recent = if recent.is_empty() { "No errors recorded." } else { recent };
     let text = format!(
-        "Doftar {}\nmacOS {macos} ({})\nmacOS crash reports: {reports}\n\nRecent errors:\n{recent}\n",
+        "Doftar {}\n{macos} ({})\nCrash reports: {reports}\n\nRecent errors:\n{recent}\n",
         env!("CARGO_PKG_VERSION"),
         std::env::consts::ARCH,
     );
@@ -138,26 +155,37 @@ fn report(macos: &str, reports: &[String], log: &str, home: Option<&str>) -> Str
     }
 }
 
-/// Help → Copy Diagnostic Info. Rust writes the pasteboard because WebKit refuses a page's copy without a click in that page, and a crashed page can't copy at all.
-/// On the main thread, like the other pasteboard commands. The log is small and on this Mac.
+/// Help → Copy Diagnostic Info. On macOS Rust writes the pasteboard itself because WebKit refuses a
+/// page's copy without a click in that page; there the empty string tells the page it is already done.
+/// On Linux there is no native text pasteboard, so the text comes back for the page to copy.
 #[tauri::command]
-pub fn copy_diagnostics() -> Result<(), String> {
+pub fn copy_diagnostics() -> Result<String, String> {
     let home = dirs::home_dir();
     let log = log_path().and_then(|p| fs::read(p).ok()).unwrap_or_default();
+    #[cfg(target_os = "macos")]
     let reports = home
         .as_ref()
         .map(|h| crash_reports(&h.join("Library/Logs/DiagnosticReports")))
         .unwrap_or_default();
+    #[cfg(not(target_os = "macos"))]
+    let reports: Vec<String> = Vec::new();
     let text = report(
-        &macos_version(),
+        &os_version(),
         &reports,
         &String::from_utf8_lossy(&log),
         home.as_ref().and_then(|h| h.to_str()),
     );
-    if crate::clipboard::write_text(&text) {
-        Ok(())
-    } else {
-        Err("Couldn't copy diagnostic info".to_string())
+    #[cfg(target_os = "macos")]
+    {
+        if crate::clipboard::write_text(&text) {
+            Ok(String::new())
+        } else {
+            Err("Couldn't copy diagnostic info".to_string())
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(text)
     }
 }
 
@@ -221,14 +249,14 @@ mod tests {
     #[test]
     fn a_report_hides_the_home_folder_and_says_when_it_is_empty() {
         let log = entry("panic", "panicked at /Users/someone/project/a.rs:1:1");
-        let text = report("26.1", &["Doftar-1.ips".to_string()], &log, Some("/Users/someone"));
+        let text = report("macOS 26.1", &["Doftar-1.ips".to_string()], &log, Some("/Users/someone"));
         assert!(!text.contains("/Users/someone"), "{text}");
         assert!(text.contains("~/project/a.rs"), "{text}");
         assert!(text.contains("macOS 26.1"), "{text}");
         assert!(text.contains("Doftar-1.ips"), "{text}");
         let empty = report("26.1", &[], "", None);
         assert!(empty.contains("No errors recorded."), "{empty}");
-        assert!(empty.contains("crash reports: none"), "{empty}");
+        assert!(empty.contains("Crash reports: none"), "{empty}");
     }
 
     #[test]

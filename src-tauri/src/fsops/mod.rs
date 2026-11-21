@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
@@ -80,6 +81,12 @@ pub const PACKAGE_EXTS: &[&str] = &[
 ];
 
 pub(crate) fn is_package_dir(path: &Path, ext: &str) -> bool {
+    // Package bundles are a macOS concept; on Linux a ".app" folder is a folder.
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (path, ext);
+        return false;
+    }
     if PACKAGE_EXTS.contains(&ext) {
         return true;
     }
@@ -110,7 +117,7 @@ pub fn build_entry(
     show_hidden: bool,
 ) -> Option<FileEntry> {
     let mut entry = build_entry_untagged(p, name, lmeta, show_hidden)?;
-    entry.tags = crate::tags::read(p);
+    entry.tags = crate::tags::read_cached(p, &entry.path);
     Some(entry)
 }
 
@@ -143,7 +150,7 @@ pub(crate) fn build_entry_untagged(
     };
     Some(FileEntry {
         name,
-        path: p.to_string_lossy().to_string(),
+        path: crate::paths::encode(p),
         is_dir,
         is_hidden: hidden,
         is_symlink,
@@ -159,7 +166,8 @@ pub(crate) fn build_entry_untagged(
     })
 }
 
-mod copy;
+// pub(crate) so the save-replace path in imgedit.rs can reuse keep_times/keep_xattrs.
+pub(crate) mod copy;
 mod delete;
 mod list;
 mod steps;
@@ -200,7 +208,7 @@ fn same_inode(a: std::io::Result<fs::Metadata>, b: std::io::Result<fs::Metadata>
 }
 
 /// False when the dot is part of the name, as in "Project v1.2".
-fn plausible_ext(ext: &str) -> bool {
+pub(crate) fn plausible_ext(ext: &str) -> bool {
     (1..=12).contains(&ext.len())
         && ext.chars().all(|c| c.is_ascii_alphanumeric())
         && ext.chars().any(|c| c.is_ascii_alphabetic())
@@ -232,12 +240,37 @@ pub(crate) fn is_plain_dir(p: &Path) -> bool {
         )
 }
 
-fn copy_candidate(name: &str, n: usize, plain_dir: bool) -> String {
+/// `copy_candidate` over raw bytes: a file name must arrive byte-exact, so a non-UTF-8
+/// name must not pass through a lossy string. The suffix splices into the bytes with
+/// the same stem/ext split as `split_ext` (an extension is text, so a non-text tail
+/// belongs to the stem).
+fn copy_candidate(name: &OsStr, n: usize, plain_dir: bool) -> OsString {
+    use std::os::unix::ffi::OsStringExt;
+    let bytes = name.as_bytes();
     if n == 0 {
-        return name.to_string();
+        return OsString::from_vec(bytes.to_vec());
     }
-    let (stem, ext) = split_ext(name, plain_dir);
-    format!("{}_copy_{}{}", stem, n, ext)
+    let ext_start = bytes
+        .iter()
+        .rposition(|&b| b == b'.')
+        .filter(|&i| i > 0 && !plain_dir)
+        .filter(|&i| std::str::from_utf8(&bytes[i + 1..]).is_ok_and(plausible_ext))
+        .map(|i| {
+            // "x.tar.gz" keeps the pair together when the stem ends in .tar.
+            let stem = &bytes[..i];
+            match stem.iter().rposition(|&b| b == b'.') {
+                Some(j) if j > 0 && stem[j + 1..].eq_ignore_ascii_case(b"tar") => j,
+                _ => i,
+            }
+        });
+    let (stem, ext) = match ext_start {
+        Some(i) => (&bytes[..i], &bytes[i..]),
+        None => (bytes, &b""[..]),
+    };
+    let mut candidate = stem.to_vec();
+    candidate.extend_from_slice(format!("_copy_{n}").as_bytes());
+    candidate.extend_from_slice(ext);
+    OsString::from_vec(candidate)
 }
 
 fn same_dir(a: Option<&Path>, b: &Path) -> bool {
@@ -263,7 +296,7 @@ pub(crate) fn unique_name(dir: &Path, base: &str, ext: &str) -> String {
 }
 
 pub(crate) fn path_str(p: &Path) -> String {
-    p.to_string_lossy().to_string()
+    crate::paths::encode(p)
 }
 
 pub(crate) fn label(p: &Path) -> String {
@@ -367,7 +400,7 @@ mod tests {
 
         let made = create_file(path_str(&base)).unwrap();
         let Step::Trash { path, .. } = &made else { panic!("{made:?}") };
-        replace(Path::new(path));
+        replace(crate::paths::real(path));
         let res = run_steps(std::slice::from_ref(&made), &job);
         assert!(res.errors[0].contains("replaced"), "{:?}", res.errors);
         assert_eq!(res.failed, vec![made.clone()]);
@@ -484,10 +517,10 @@ mod tests {
             .success());
         let job = jobs::detached();
 
-        let first = copy_to_unique(&src, &dest, "src", &job).unwrap();
-        let second = copy_to_unique(&src, &dest, "src", &job).unwrap();
-        let file = copy_to_unique(&src.join("a.txt"), &dest, "a.txt", &job).unwrap();
-        let file2 = copy_to_unique(&src.join("a.txt"), &dest, "a.txt", &job).unwrap();
+        let first = copy_to_unique(&src, &dest, OsStr::new("src"), &job).unwrap();
+        let second = copy_to_unique(&src, &dest, OsStr::new("src"), &job).unwrap();
+        let file = copy_to_unique(&src.join("a.txt"), &dest, OsStr::new("a.txt"), &job).unwrap();
+        let file2 = copy_to_unique(&src.join("a.txt"), &dest, OsStr::new("a.txt"), &job).unwrap();
         assert_eq!(first, dest.join("src"));
         assert_eq!(second, dest.join("src_copy_1"));
         assert_eq!(file, dest.join("a.txt"));
@@ -554,7 +587,7 @@ mod tests {
     fn a_firmlinked_path_is_the_same_folder() {
         let base = scratch("firm");
         let real = fs::canonicalize(&base).unwrap();
-        let via = Path::new("/System/Volumes/Data").join(real.strip_prefix("/").unwrap());
+        let via = crate::paths::real("/System/Volumes/Data").join(real.strip_prefix("/").unwrap());
         if via.exists() {
             assert!(same_dir(Some(&base), &via));
         }
@@ -588,7 +621,7 @@ mod tests {
         fs::write(base.join("dest/a.txt"), "UNRELATED WORK").unwrap();
         let job = jobs::detached();
         for cross in [true, false] {
-            let moved = move_item(&base.join("a.txt"), &base.join("dest"), "a.txt", &job, cross, false).unwrap();
+            let moved = move_item(&base.join("a.txt"), &base.join("dest"), OsStr::new("a.txt"), &job, cross, false).unwrap();
             assert_eq!(moved.to, base.join("dest/a_copy_1.txt"));
             assert_eq!(fs::read_to_string(base.join("dest/a.txt")).unwrap(), "UNRELATED WORK");
             assert!(moved.trashed_old.is_none());
@@ -621,7 +654,7 @@ mod tests {
         fs::create_dir_all(base.join("dest")).unwrap();
         let job = jobs::detached();
         job.cancel();
-        assert!(move_item(&base.join("src"), &base.join("dest"), "src", &job, true, false).is_err());
+        assert!(move_item(&base.join("src"), &base.join("dest"), OsStr::new("src"), &job, true, false).is_err());
         assert!(!base.join("dest/src").exists());
         assert!(base.join("src/sub").exists());
         fs::remove_dir_all(&base).unwrap();
@@ -665,7 +698,7 @@ mod tests {
         fs::write(src.join("big.bin"), vec![0u8; 2 << 20]).unwrap();
         let job = jobs::detached();
         job.cancel();
-        assert!(copy_to_unique(&src, &dest, "src", &job).is_err());
+        assert!(copy_to_unique(&src, &dest, OsStr::new("src"), &job).is_err());
         assert_eq!(fs::read_dir(&dest).unwrap().count(), 0);
         fs::remove_dir_all(&base).unwrap();
     }
@@ -681,12 +714,12 @@ mod tests {
         fs::write(base.join("one.txt"), "1").unwrap();
         let job = jobs::detached();
 
-        let moved = move_item(&src, &dest, "tree", &job, true, false).unwrap();
+        let moved = move_item(&src, &dest, OsStr::new("tree"), &job, true, false).unwrap();
         assert!(moved.leftover.is_none());
         assert_eq!(moved.to, dest.join("tree"));
         assert!(!src.exists());
         assert_eq!(fs::read_to_string(dest.join("tree/sub/f.txt")).unwrap(), "x");
-        let moved = move_item(&base.join("one.txt"), &dest, "one.txt", &job, true, false).unwrap();
+        let moved = move_item(&base.join("one.txt"), &dest, OsStr::new("one.txt"), &job, true, false).unwrap();
         assert_eq!(fs::read_to_string(moved.to).unwrap(), "1");
         assert_eq!(fs::read_dir(&dest).unwrap().count(), 2);
 
@@ -695,7 +728,7 @@ mod tests {
         fs::write(keep.join("k.txt"), "k").unwrap();
         let job = jobs::detached();
         job.cancel();
-        assert!(move_item(&keep, &dest, "keep", &job, true, false).is_err());
+        assert!(move_item(&keep, &dest, OsStr::new("keep"), &job, true, false).is_err());
         assert!(keep.join("k.txt").exists());
         assert_eq!(fs::read_dir(&dest).unwrap().count(), 2);
         fs::remove_dir_all(&base).unwrap();
@@ -780,7 +813,7 @@ mod tests {
     #[test]
     #[ignore = "needs DOFTAR_TEST_SHARE"]
     fn share_without_trash_offers_delete_and_replaces_in_place() {
-        let share = PathBuf::from(std::env::var("DOFTAR_TEST_SHARE").unwrap());
+        let share = crate::paths::real(std::env::var("DOFTAR_TEST_SHARE").unwrap());
         assert!(is_network_volume(&path_str(&share)));
         let dir = share.join(format!("wf-share-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
@@ -794,9 +827,9 @@ mod tests {
 
         let local = scratch("share-src");
         fs::write(local.join("a.txt"), "new").unwrap();
-        let (to, aside) = copy_replacing(&local.join("a.txt"), &dir, "a.txt", &jobs::detached()).unwrap();
+        let (to, aside) = copy_replacing(&local.join("a.txt"), &dir, OsStr::new("a.txt"), &jobs::detached()).unwrap();
         assert_eq!(to, on_share);
-        let aside = PathBuf::from(aside.expect("the old item is set aside for undo"));
+        let aside = crate::paths::real(aside.expect("the old item is set aside for undo"));
         assert!(is_aside_name(&label(&aside)));
         assert_eq!(fs::read_to_string(&on_share).unwrap(), "new");
         assert_eq!(fs::read_to_string(&aside).unwrap(), "old");
@@ -871,13 +904,13 @@ mod tests {
         std::os::unix::fs::symlink(base.join("real"), base.join("dirlink")).unwrap();
         let job = jobs::detached();
 
-        let copied = copy_to_unique(&base.join("dangling"), &dest, "dangling", &job).unwrap();
+        let copied = copy_to_unique(&base.join("dangling"), &dest, OsStr::new("dangling"), &job).unwrap();
         assert!(is_link(&copied));
-        assert_eq!(fs::read_link(&copied).unwrap(), Path::new("nowhere"));
-        let again = copy_to_unique(&base.join("dangling"), &dest, "dangling", &job).unwrap();
+        assert_eq!(fs::read_link(&copied).unwrap(), crate::paths::real("nowhere"));
+        let again = copy_to_unique(&base.join("dangling"), &dest, OsStr::new("dangling"), &job).unwrap();
         assert_eq!(again, dest.join("dangling_copy_1"));
 
-        let moved = move_item(&base.join("dirlink"), &dest, "dirlink", &job, true, false).unwrap();
+        let moved = move_item(&base.join("dirlink"), &dest, OsStr::new("dirlink"), &job, true, false).unwrap();
         assert!(moved.leftover.is_none());
         assert!(is_link(&moved.to), "a link to a folder stays a link across volumes");
         assert!(!is_link(&base.join("dirlink")));
@@ -887,15 +920,31 @@ mod tests {
 
     #[test]
     fn copy_names_split_only_real_extensions() {
-        assert_eq!(copy_candidate("a.txt", 1, false), "a_copy_1.txt");
-        assert_eq!(copy_candidate("a.tar.gz", 2, false), "a_copy_2.tar.gz");
-        assert_eq!(copy_candidate("Project v1.2", 1, false), "Project v1.2_copy_1");
-        assert_eq!(copy_candidate("Project v1.2", 1, true), "Project v1.2_copy_1");
-        assert_eq!(copy_candidate("notes.final", 1, true), "notes.final_copy_1");
-        assert_eq!(copy_candidate("Thing.app", 1, false), "Thing_copy_1.app");
-        assert_eq!(copy_candidate(".zshrc", 1, false), ".zshrc_copy_1");
-        assert_eq!(copy_candidate("song.mp3", 1, false), "song_copy_1.mp3");
-        assert_eq!(copy_candidate("a.b c", 1, false), "a.b c_copy_1");
+        assert_eq!(copy_candidate(OsStr::new("a.txt"), 1, false), "a_copy_1.txt");
+        assert_eq!(copy_candidate(OsStr::new("a.tar.gz"), 2, false), "a_copy_2.tar.gz");
+        assert_eq!(copy_candidate(OsStr::new("Project v1.2"), 1, false), "Project v1.2_copy_1");
+        assert_eq!(copy_candidate(OsStr::new("Project v1.2"), 1, true), "Project v1.2_copy_1");
+        assert_eq!(copy_candidate(OsStr::new("notes.final"), 1, true), "notes.final_copy_1");
+        assert_eq!(copy_candidate(OsStr::new("Thing.app"), 1, false), "Thing_copy_1.app");
+        assert_eq!(copy_candidate(OsStr::new(".zshrc"), 1, false), ".zshrc_copy_1");
+        assert_eq!(copy_candidate(OsStr::new("song.mp3"), 1, false), "song_copy_1.mp3");
+        assert_eq!(copy_candidate(OsStr::new("a.b c"), 1, false), "a.b c_copy_1");
+        // Raw bytes stay exact, suffix included.
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let raw = OsStr::from_bytes(b"bad\xffname.mp3");
+        assert_eq!(
+            copy_candidate(raw, 0, false).to_os_string(),
+            OsStr::from_bytes(b"bad\xffname.mp3").to_os_string()
+        );
+        assert_eq!(
+            copy_candidate(raw, 1, false).into_vec(),
+            b"bad\xffname_copy_1.mp3".to_vec()
+        );
+        let raw_dir = OsStr::from_bytes(b"bad\xffname");
+        assert_eq!(
+            copy_candidate(raw_dir, 1, true).into_vec(),
+            b"bad\xffname_copy_1".to_vec()
+        );
 
         let base = scratch("names");
         let dest = base.join("dest");
@@ -904,8 +953,8 @@ mod tests {
         fs::create_dir_all(&dest).unwrap();
         let job = jobs::detached();
         for _ in 0..2 {
-            copy_to_unique(&base.join("Project v1.2"), &dest, "Project v1.2", &job).unwrap();
-            copy_to_unique(&base.join("Thing.app"), &dest, "Thing.app", &job).unwrap();
+            copy_to_unique(&base.join("Project v1.2"), &dest, OsStr::new("Project v1.2"), &job).unwrap();
+            copy_to_unique(&base.join("Thing.app"), &dest, OsStr::new("Thing.app"), &job).unwrap();
         }
         assert!(dest.join("Project v1.2_copy_1/inner").is_dir());
         assert!(dest.join("Thing_copy_1.app/Contents").is_dir());
@@ -920,7 +969,7 @@ mod tests {
         let real = base.join("real");
         assert!(is_within_subtree(&real, &real));
         assert!(is_within_subtree(&real, &base.join("link/sub")));
-        assert!(is_within_subtree(&real, Path::new(&path_str(&real.join("SUB")).replace("/real/", "/REAL/"))));
+        assert!(is_within_subtree(&real, crate::paths::real(&path_str(&real.join("SUB")).replace("/real/", "/REAL/"))));
         // A link moves as the link, so it can go into its target.
         assert!(!is_within_subtree(&base.join("link"), &real.join("sub")));
         assert!(!is_within_subtree(&real.join("sub"), &real));
@@ -1129,6 +1178,32 @@ mod tests {
     }
 
     #[test]
+    fn a_non_utf8_name_arrives_byte_exact() {
+        let base = scratch("rawname");
+        let dest1 = base.join("dest1");
+        let dest2 = base.join("dest2");
+        fs::create_dir_all(&dest1).unwrap();
+        fs::create_dir_all(&dest2).unwrap();
+        let job = jobs::detached();
+        use std::os::unix::ffi::OsStrExt;
+        let src = base.join(OsStr::from_bytes(b"raw\xffname.txt"));
+        fs::write(&src, "x").unwrap();
+
+        let res = run_transfer(&[path_str(&src)], &path_str(&dest1), Mode::Copy, &Resolutions::new(), &job);
+        assert!(res.errors.is_empty(), "{:?}", res.errors);
+        let copied: Vec<_> = fs::read_dir(&dest1).unwrap().flatten().map(|e| e.into_path()).collect();
+        assert_eq!(copied, vec![dest1.join(OsStr::from_bytes(b"raw\xffname.txt"))]);
+
+        let res = run_transfer(&[path_str(&src)], &path_str(&dest2), Mode::Move, &Resolutions::new(), &job);
+        assert!(res.errors.is_empty(), "{:?}", res.errors);
+        assert!(!src.exists());
+        let mut moved: Vec<_> = fs::read_dir(&dest2).unwrap().flatten().map(|e| e.file_name()).collect();
+        assert_eq!(moved.len(), 1, "{moved:?}");
+        assert_eq!(moved.pop().unwrap().as_bytes(), b"raw\xffname.txt");
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
     fn move_replace_skip_and_keep_both() {
         let base = scratch("movr");
         let dest = base.join("dest");
@@ -1157,6 +1232,37 @@ mod tests {
         assert!(res.errors.is_empty());
         assert_eq!(fs::read_to_string(dest.join("a_copy_1.txt")).unwrap(), "A");
         assert_eq!(fs::read_to_string(dest.join("a.txt")).unwrap(), "old");
+        fs::remove_dir_all(&base).unwrap();
+    }
+}
+
+#[cfg(all(test, not(target_os = "macos")))]
+mod linux_tests {
+    use super::*;
+
+    /// A FIFO in a copied tree is refused with a per-file error instead of blocking the
+    /// job thread on `open`, where Cancel could not reach it.
+    #[test]
+    fn a_fifo_is_refused_not_waited_on() {
+        use std::os::unix::ffi::OsStrExt;
+        let base = std::env::temp_dir().join(format!("doftar-copy-fifo-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("src")).unwrap();
+        fs::write(base.join("src/a.txt"), "x").unwrap();
+        let c = std::ffi::CString::new(base.join("src/pipe").as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o644) }, 0);
+        let job = jobs::detached();
+        let from = base.join("src");
+        let to = base.join("dst");
+        // Run off-thread: if the guard ever regresses, this fails instead of hanging the suite.
+        let handle = std::thread::spawn(move || copy_item(&from, &to, &job));
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !handle.is_finished() {
+            assert!(std::time::Instant::now() < deadline, "copy blocked on a fifo instead of refusing it");
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let err = handle.join().unwrap().unwrap_err();
+        assert!(err.to_string().contains("pipe"), "{err}");
         fs::remove_dir_all(&base).unwrap();
     }
 }

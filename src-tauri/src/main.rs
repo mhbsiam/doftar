@@ -26,19 +26,26 @@ mod netguard;
 mod notebook;
 mod npy;
 mod opened;
+mod paths;
 mod openwith;
 mod pdf;
+mod proc;
 mod store;
 mod tags;
+// macOS bundle uninstall, native Quick Look and the share sheet have no Linux
+// equivalent (see LINUX.md). The modules stay for macOS builds of this tree.
+#[cfg(target_os = "macos")]
 mod uninstall;
 mod props;
 mod metadata;
 mod quarantine;
 #[cfg(target_os = "macos")]
 mod dock;
+#[cfg(target_os = "macos")]
 mod quicklook;
 mod reader;
 mod search;
+#[cfg(target_os = "macos")]
 mod share;
 mod sheets;
 mod skills;
@@ -136,6 +143,11 @@ fn set_window_maximized(window: WebviewWindow, on: bool) -> Result<bool, String>
         let (_, pos, size) = prev.remove(i);
         zoom::set_frame(&window, pos, size).map_err(|e| e.to_string())?;
         return Ok(true);
+    }
+    // Wayland keeps window placement to the compositor, so a centred double would not land there.
+    #[cfg(not(target_os = "macos"))]
+    if zoom::linux::cannot_place() {
+        return Ok(false);
     }
     let area = *window
         .current_monitor()
@@ -267,6 +279,7 @@ fn main() {
             clipboard::clipboard_clear,
             clipboard::clipboard_paste_data,
             archive::archive_list,
+            archive::archive_extractable,
             dupes::find_duplicates,
             menu::set_undo_labels,
             menu::set_terminal_label,
@@ -297,21 +310,25 @@ fn main() {
             openwith::open_path,
             openwith::open_link_target,
             openwith::reveal_in_finder,
-            openwith::pick_application,
+            #[cfg(not(target_os = "macos"))]
+            openwith::all_apps,
             openwith::terminal_apps,
             openwith::editor_apps,
             openwith::runs_as_program,
             thumbs::thumbnail,
             thumbs::thumbnail_cached,
-            thumbs::pdf_page_sizes,
-            thumbs::pdf_page_picture,
             thumbs::cancel_thumbnail,
             cache::cache_info,
+            #[cfg(target_os = "macos")]
             uninstall::app_leftovers,
+            #[cfg(target_os = "macos")]
             uninstall::delete_apps_with_admin,
             cache::clear_cache,
+            #[cfg(target_os = "macos")]
             quicklook::quicklook,
+            #[cfg(target_os = "macos")]
             quicklook::quicklook_close,
+            #[cfg(target_os = "macos")]
             share::share_paths,
             windows::open_tab_window,
             windows::take_window_init,
@@ -402,6 +419,7 @@ fn main() {
         .setup(|app| {
             downloads::init(app.handle().clone());
             watcher::init(app.handle().clone());
+            #[cfg(target_os = "macos")]
             quicklook::init(app.handle());
             #[cfg(target_os = "macos")]
             dock::init(app.handle());
@@ -484,8 +502,11 @@ mod tests {
     fn handler_commands(source: &str) -> Vec<String> {
         let start = source.find("generate_handler![").unwrap() + "generate_handler![".len();
         let end = start + source[start..].find("])").unwrap();
+        // An entry behind `#[cfg(target_os = "macos")]` is not compiled on Linux, so it
+        // needs no permission on this target. Uninstall, Quick Look and Share (see LINUX.md).
         source[start..end]
             .split(',')
+            .filter(|c| !c.contains("#[cfg(target_os"))
             .map(|c| c.trim().rsplit("::").next().unwrap().to_string())
             .filter(|c| !c.is_empty())
             .collect()

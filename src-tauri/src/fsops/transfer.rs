@@ -66,7 +66,7 @@ pub(super) fn sweep_journals(dir: &Path) {
 pub(super) fn copy_to_unique(
     from: &Path,
     dest_dir: &Path,
-    name: &str,
+    name: &OsStr,
     job: &Job,
 ) -> Result<PathBuf, String> {
     let plain_dir = is_plain_dir(from);
@@ -83,8 +83,9 @@ pub(super) fn copy_to_unique(
 }
 
 /// Renames `from` into `dest_dir` as `name`, or the first free "name_copy_N".
-/// Never overwrites an item, even one that arrives meanwhile.
-pub(super) fn claim_name(from: &Path, dest_dir: &Path, name: &str, plain_dir: bool) -> std::io::Result<PathBuf> {
+/// Never overwrites an item, even one that arrives meanwhile. The name is raw bytes:
+/// a non-UTF-8 name must not arrive lossily renamed.
+pub(super) fn claim_name(from: &Path, dest_dir: &Path, name: &OsStr, plain_dir: bool) -> std::io::Result<PathBuf> {
     let mut n = 0usize;
     loop {
         let candidate = dest_dir.join(copy_candidate(name, n, plain_dir));
@@ -105,12 +106,29 @@ pub(crate) fn rename_excl(from: &Path, to: &Path) -> std::io::Result<()> {
             .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))
     };
     let (f, t) = (c(from)?, c(to)?);
-    if unsafe { libc::renamex_np(f.as_ptr(), t.as_ptr(), libc::RENAME_EXCL) } == 0 {
+    // SAFETY: `f` and `t` are NUL-terminated C strings.
+    let rc = unsafe {
+        #[cfg(target_os = "macos")]
+        {
+            libc::renamex_np(f.as_ptr(), t.as_ptr(), libc::RENAME_EXCL)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            libc::renameat2(
+                libc::AT_FDCWD,
+                f.as_ptr(),
+                libc::AT_FDCWD,
+                t.as_ptr(),
+                libc::RENAME_NOREPLACE,
+            )
+        }
+    };
+    if rc == 0 {
         return Ok(());
     }
     let err = std::io::Error::last_os_error();
     match err.raw_os_error() {
-        Some(libc::ENOTSUP) | Some(libc::EINVAL) => rename_claimed(from, to),
+        Some(libc::ENOTSUP) | Some(libc::EINVAL) | Some(libc::ENOSYS) => rename_claimed(from, to),
         _ => Err(err),
     }
 }
@@ -184,7 +202,7 @@ pub(crate) fn is_aside_name(name: &str) -> bool {
 /// Moves `p` to a hidden name beside it, on a volume with no Trash, so undo can restore it.
 /// The name is unique across restarts. `discard_asides` removes it later.
 pub(super) fn set_aside(p: &Path) -> std::io::Result<PathBuf> {
-    let dir = p.parent().unwrap_or(Path::new("/"));
+    let dir = p.parent().unwrap_or(std::path::Path::new("/"));
     let stamp = unix_ms(Ok(std::time::SystemTime::now()));
     loop {
         let n = ASIDE_SEQ.fetch_add(1, Ordering::Relaxed);
@@ -213,7 +231,7 @@ pub(super) fn make_room(to: &Path, replace: bool) -> Result<Room, String> {
 /// If something else took its place, the item stays in the Trash or beside it.
 pub(super) fn restore_room(to: &Path, room: Room) {
     if let Room::Kept(p) = room {
-        let _ = rename_excl(Path::new(&p), to);
+        let _ = rename_excl(&(crate::paths::real(&p)), to);
     }
 }
 
@@ -221,9 +239,9 @@ pub(super) fn restore_room(to: &Path, room: Room) {
 #[tauri::command(async)]
 pub fn discard_asides(paths: Vec<String>) {
     for p in paths {
-        let p = Path::new(&p);
-        if is_aside_name(&label(p)) && guard::check(p).is_ok() {
-            remove_path(p);
+        let p = crate::paths::real(&p);
+        if is_aside_name(&label(&(p))) && guard::check(&(p)).is_ok() {
+            remove_path(&(p));
         }
     }
 }
@@ -231,20 +249,21 @@ pub fn discard_asides(paths: Vec<String>) {
 pub(super) fn move_item(
     from: &Path,
     dest_dir: &Path,
-    name: &str,
+    raw_name: &OsStr,
     job: &Job,
     force_cross_volume: bool,
     replace: bool,
 ) -> Result<Moved, String> {
     let is_dir = fs::symlink_metadata(from).map(|m| m.is_dir()).unwrap_or(false);
     let plain_dir = is_plain_dir(from);
+    let name = raw_name.to_string_lossy();
     // Put the item at its name, never over an item that arrived meanwhile.
     // With `replace`, move the old item off first.
     let land = |item: &Path| -> std::io::Result<(PathBuf, Room)> {
         if !replace {
-            return claim_name(item, dest_dir, name, plain_dir).map(|to| (to, Room::Empty));
+            return claim_name(item, dest_dir, raw_name, plain_dir).map(|to| (to, Room::Empty));
         }
-        let to = dest_dir.join(name);
+        let to = dest_dir.join(raw_name);
         let room = make_room(&to, true).map_err(std::io::Error::other)?;
         match rename_excl(item, &to) {
             Ok(()) => Ok((to, room)),
@@ -308,7 +327,7 @@ pub(super) fn move_item(
 pub(super) fn copy_replacing(
     from: &Path,
     dest_dir: &Path,
-    name: &str,
+    name: &OsStr,
     job: &Job,
 ) -> Result<(PathBuf, Option<String>), String> {
     let to = dest_dir.join(name);
@@ -367,7 +386,7 @@ impl Placed {
     }
 }
 
-pub(super) fn decide(from: &Path, dest: &Path, name: &str, resolutions: &Resolutions) -> Resolution {
+pub(super) fn decide(from: &Path, dest: &Path, name: &OsStr, resolutions: &Resolutions) -> Resolution {
     if !exists(&dest.join(name)) || same_dir(from.parent(), dest) {
         return Resolution::KeepBoth;
     }
@@ -385,24 +404,26 @@ pub(super) fn copy_one(
     resolutions: &Resolutions,
     placed: &mut Placed,
 ) {
-    let from = Path::new(src);
-    let Some(name) = from.file_name().map(|s| s.to_string_lossy().to_string()) else {
+    let from = crate::paths::real(src);
+    // The raw name builds the destination; only the messages get a lossy copy.
+    let Some(raw_name) = from.file_name().map(|s| s.to_os_string()) else {
         res.errors.push(format!("invalid source path: {src}"));
         job.item_done();
         return;
     };
-    if is_within_subtree(from, dest) {
+    let name = raw_name.to_string_lossy().to_string();
+    if is_within_subtree(&(from), dest) {
         res.errors
             .push(format!("Can't put \"{name}\" into itself or its own subfolder"));
         job.item_done();
         return;
     }
-    let decision = placed.guard(&name, decide(from, dest, &name, resolutions));
+    let decision = placed.guard(&name, decide(&(from), dest, &raw_name, resolutions));
     if decision == Resolution::Skip {
         job.item_done();
         return;
     }
-    if decision == Resolution::Replace && holds_item(&dest.join(&name), from) {
+    if decision == Resolution::Replace && holds_item(&dest.join(&raw_name), &(from)) {
         res.errors
             .push(format!("Can't replace \"{name}\" with an item inside it"));
         job.item_done();
@@ -410,7 +431,7 @@ pub(super) fn copy_one(
     }
     job.set_current(&name);
     let done = if decision == Resolution::Replace {
-        copy_replacing(from, dest, &name, job).map(|(p, trashed)| {
+        copy_replacing(&(from), dest, &raw_name, job).map(|(p, trashed)| {
             placed.add(&p);
             let mut undo = vec![Step::trash(path_str(&p))];
             if let Some(old) = trashed {
@@ -419,7 +440,7 @@ pub(super) fn copy_one(
             undo
         })
     } else {
-        copy_to_unique(from, dest, &name, job).map(|p| {
+        copy_to_unique(&(from), dest, &raw_name, job).map(|p| {
             placed.add(&p);
             vec![Step::trash(path_str(&p))]
         })
@@ -441,13 +462,15 @@ pub(super) fn move_one(
     resolutions: &Resolutions,
     placed: &mut Placed,
 ) {
-    let from = Path::new(src);
-    let Some(name) = from.file_name().map(|s| s.to_string_lossy().to_string()) else {
+    let from = crate::paths::real(src);
+    // The raw name builds the destination; only the messages get a lossy copy.
+    let Some(raw_name) = from.file_name().map(|s| s.to_os_string()) else {
         res.errors.push(format!("invalid source path: {src}"));
         job.item_done();
         return;
     };
-    if is_within_subtree(from, dest) {
+    let name = raw_name.to_string_lossy().to_string();
+    if is_within_subtree(&(from), dest) {
         res.errors
             .push(format!("Can't move \"{name}\" into itself or its own subfolder"));
         job.item_done();
@@ -457,17 +480,17 @@ pub(super) fn move_one(
         job.item_done();
         return;
     }
-    if let Err(e) = guard::check(from) {
+    if let Err(e) = guard::check(&(from)) {
         res.errors.push(format!("\"{name}\": {e}"));
         job.item_done();
         return;
     }
-    let decision = placed.guard(&name, decide(from, dest, &name, resolutions));
+    let decision = placed.guard(&name, decide(&(from), dest, &raw_name, resolutions));
     if decision == Resolution::Skip {
         job.item_done();
         return;
     }
-    if decision == Resolution::Replace && holds_item(&dest.join(&name), from) {
+    if decision == Resolution::Replace && holds_item(&dest.join(&raw_name), &(from)) {
         res.errors
             .push(format!("Can't replace \"{name}\" with an item inside it"));
         job.item_done();
@@ -475,9 +498,9 @@ pub(super) fn move_one(
     }
     job.set_current(&name);
     match move_item(
-        from,
+        &(from),
         dest,
-        &name,
+        &raw_name,
         job,
         force_cross_volume,
         decision == Resolution::Replace,
@@ -529,19 +552,19 @@ pub(super) fn run_transfer(
     resolutions: &Resolutions,
     job: &JobGuard,
 ) -> OpResult {
-    let dest = Path::new(dest_dir);
+    let dest = crate::paths::real(dest_dir);
     let copies = |s: &str| match mode {
         Mode::Copy => true,
         Mode::Move => false,
-        Mode::Drop { force_copy } => force_copy || !on_same_volume(Path::new(s), dest),
+        Mode::Drop { force_copy } => force_copy || !on_same_volume(&crate::paths::real(s), &dest),
     };
     let heavy: Vec<String> = sources
         .iter()
-        .filter(|s| copies(s) || !on_same_volume(Path::new(s), dest))
+        .filter(|s| copies(s) || !on_same_volume(&crate::paths::real(s), &dest))
         .cloned()
         .collect();
     job.set_items_total(sources.len());
-    jobs::start_scan(job, heavy, Some(dest));
+    jobs::start_scan(job, heavy, Some(&(dest)));
     let mut res = OpResult::default();
     let mut placed = Placed::default();
     for src in sources {
@@ -551,9 +574,9 @@ pub(super) fn run_transfer(
             break;
         }
         if copies(src) {
-            copy_one(src, dest, job, &mut res, resolutions, &mut placed);
+            copy_one(src, &(dest), job, &mut res, resolutions, &mut placed);
         } else {
-            move_one(src, dest, job, &mut res, false, resolutions, &mut placed);
+            move_one(src, &(dest), job, &mut res, false, resolutions, &mut placed);
         }
         if res.cancelled {
             break;
@@ -610,16 +633,16 @@ pub(super) fn on_same_volume(src: &Path, dest: &Path) -> bool {
 
 #[tauri::command(async)]
 pub fn drop_moves(sources: Vec<String>, dest_dir: String) -> bool {
-    let dest = Path::new(&dest_dir);
-    !sources.is_empty() && sources.iter().all(|s| on_same_volume(Path::new(s), dest))
+    let dest = crate::paths::real(&dest_dir);
+    !sources.is_empty() && sources.iter().all(|s| on_same_volume(&crate::paths::real(s), &dest))
 }
 
 #[tauri::command(async)]
 pub fn drop_plan(sources: Vec<String>, dest_dir: String) -> Vec<bool> {
-    let dest = Path::new(&dest_dir);
+    let dest = crate::paths::real(&dest_dir);
     sources
         .iter()
-        .map(|s| on_same_volume(Path::new(s), dest))
+        .map(|s| on_same_volume(&crate::paths::real(s), &dest))
         .collect()
 }
 
@@ -672,20 +695,20 @@ pub(super) fn conflict_side(p: &Path) -> Option<ConflictSide> {
 
 #[tauri::command(async)]
 pub fn find_conflicts(sources: Vec<String>, dest_dir: String) -> Vec<Conflict> {
-    let dest = Path::new(&dest_dir);
+    let dest = crate::paths::real(&dest_dir);
     sources
         .iter()
         .filter_map(|s| {
-            let from = Path::new(s);
+            let from = crate::paths::real(s);
             let name = from.file_name()?;
             let target = dest.join(name);
-            if !exists(&target) || same_dir(from.parent(), dest) {
+            if !exists(&target) || same_dir(from.parent(), &(dest)) {
                 return None;
             }
-            let source = conflict_side(from)?;
+            let source = conflict_side(&(from))?;
             let existing = conflict_side(&target)?;
             let can_replace =
-                source.is_dir == existing.is_dir && !holds_item(&target, from);
+                source.is_dir == existing.is_dir && !holds_item(&target, &(from));
             Some(Conflict {
                 source,
                 existing,

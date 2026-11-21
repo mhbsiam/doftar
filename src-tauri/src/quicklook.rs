@@ -47,7 +47,7 @@ pub fn quicklook(app: AppHandle, paths: Vec<String>) -> Result<(), String> {
     init(&app);
     let paths: Vec<String> = paths
         .into_iter()
-        .filter(|p| p.starts_with('/') && std::path::Path::new(p).exists())
+        .filter(|p| p.starts_with('/') && crate::paths::real(p).exists())
         .take(MAX_ITEMS)
         .collect();
     if paths.is_empty() {

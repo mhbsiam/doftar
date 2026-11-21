@@ -42,7 +42,8 @@ fn is_bundle_id(s: &str) -> bool {
 /// True if joining `name` onto a folder stays inside that folder.
 fn is_single_name(name: &str) -> bool {
     use std::path::Component;
-    let mut c = Path::new(name).components();
+    let p = crate::paths::real(name);
+    let mut c = p.components();
     !name.contains('/') && matches!((c.next(), c.next()), (Some(Component::Normal(_)), None))
 }
 
@@ -106,11 +107,11 @@ fn find_leftovers(home: &Path, app: &Path) -> Vec<Leftover> {
 #[tauri::command(async)]
 pub fn app_leftovers(path: String) -> Vec<Leftover> {
     let Some(home) = dirs::home_dir() else { return Vec::new() };
-    let app = Path::new(&path);
+    let app = crate::paths::real(&path);
     if app.extension().is_none_or(|e| !e.eq_ignore_ascii_case("app")) {
         return Vec::new();
     }
-    find_leftovers(&home, app)
+    find_leftovers(&home, &(app))
 }
 
 /// The admin deletion removes only an app bundle in an Applications folder.
@@ -122,7 +123,7 @@ fn is_installed_app(path: &Path, home: Option<&Path>) -> bool {
     if path.extension().is_none_or(|e| !e.eq_ignore_ascii_case("app")) {
         return false;
     }
-    let in_system = path.starts_with("/Applications") && path != Path::new("/Applications");
+    let in_system = path.starts_with("/Applications") && path != crate::paths::real("/Applications");
     let in_user = home.is_some_and(|h| {
         let d = h.join("Applications");
         path.starts_with(&d) && path != d
@@ -161,9 +162,9 @@ pub async fn delete_apps_with_admin(paths: Vec<String>) -> Result<(), String> {
         // Check the path as given and as it really is. A symlink, or a folder named like an app, must not reach `rm -rf`.
         // The real path reaches `rm -rf`, so the root shell can check it.
         let real = |p: &String| {
-            let given = Path::new(p);
-            let real = fs::canonicalize(given).ok()?;
-            (is_installed_app(given, home.as_deref())
+            let given = crate::paths::real(p);
+            let real = fs::canonicalize(&given).ok()?;
+            (is_installed_app(&given, home.as_deref())
                 && is_installed_app(&real, home.as_deref())
                 && crate::openwith::is_app_bundle(&real.to_string_lossy()))
             .then(|| real.to_string_lossy().into_owned())
@@ -260,12 +261,12 @@ mod tests {
         }
         for bad in ["", ".", "..", "...", "com", ".com.acme", "com.acme.", "com..acme", "a/b.c", "com.acme.Tool ", "com.ac me"] {
             assert!(!is_bundle_id(bad), "{bad:?} must be refused");
-            assert!(candidate_paths(Path::new("/Users/me"), Some(bad)).is_empty());
+            assert!(candidate_paths(&(crate::paths::real("/Users/me")), Some(bad)).is_empty());
         }
-        let lib = Path::new("/Users/me/Library");
-        for p in candidate_paths(Path::new("/Users/me"), Some("com.acme.Tool")) {
+        let lib = crate::paths::real("/Users/me/Library");
+        for p in candidate_paths(&crate::paths::real("/Users/me"), Some("com.acme.Tool")) {
             let parent = p.parent().unwrap();
-            assert!(parent.starts_with(lib) && parent != lib, "{p:?}");
+            assert!(parent.starts_with(&lib) && parent != lib.as_path(), "{p:?}");
         }
         let base = scratch("dotid");
         let app = fake_app(&base, "Dot", ".");
@@ -276,10 +277,10 @@ mod tests {
 
     #[test]
     fn admin_deletion_only_accepts_installed_apps() {
-        let home = Path::new("/Users/me");
-        assert!(is_installed_app(Path::new("/Applications/Foo.app"), Some(home)));
-        assert!(is_installed_app(Path::new("/Applications/Utilities/Bar.app"), Some(home)));
-        assert!(is_installed_app(Path::new("/Users/me/Applications/Baz.app"), Some(home)));
+        let home = crate::paths::real("/Users/me");
+        assert!(is_installed_app(&crate::paths::real("/Applications/Foo.app"), Some(&home)));
+        assert!(is_installed_app(&crate::paths::real("/Applications/Utilities/Bar.app"), Some(&home)));
+        assert!(is_installed_app(&crate::paths::real("/Users/me/Applications/Baz.app"), Some(&home)));
         for bad in [
             "/Applications",
             "/Applications/Foo",
@@ -289,7 +290,7 @@ mod tests {
             "Applications/Foo.app",
             "/",
         ] {
-            assert!(!is_installed_app(Path::new(bad), Some(home)), "{bad} must be refused");
+            assert!(!is_installed_app(&crate::paths::real(bad), Some(&home)), "{bad} must be refused");
         }
     }
 

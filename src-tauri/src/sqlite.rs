@@ -19,10 +19,13 @@ fn is_sqlite(path: &Path) -> bool {
     fs::File::open(path).and_then(|mut f| f.read_exact(&mut head)).is_ok() && &head == b"SQLite format 3\0"
 }
 
-/// Percent-encode every byte that is not plainly safe.
+/// Percent-encode every byte that is not plainly safe. The raw bytes, not a lossy
+/// string: SQLite must open the real name, and a non-UTF-8 name lossily collapsed
+/// here would name a file that does not exist.
 fn uri(path: &Path) -> String {
+    use std::os::unix::ffi::OsStrExt;
     let mut out = String::from("file:");
-    for &b in path.to_string_lossy().as_bytes() {
+    for &b in path.as_os_str().as_bytes() {
         if b.is_ascii_alphanumeric() || b"/._~-".contains(&b) {
             out.push(b as char);
         } else {

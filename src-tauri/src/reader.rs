@@ -146,7 +146,7 @@ fn link_target(href: &str, dir: &Path) -> Option<Link> {
     if rel.is_empty() {
         return None;
     }
-    Some(Link::File(if rel.starts_with('/') { PathBuf::from(rel) } else { dir.join(rel) }))
+    Some(Link::File(if rel.starts_with('/') { crate::paths::real(rel) } else { dir.join(rel) }))
 }
 
 fn percent_decode(s: &str) -> String {
@@ -244,7 +244,7 @@ pub async fn open_reader(
     icon: Option<String>,
     edit: Option<bool>,
 ) -> Result<bool, String> {
-    grant(Path::new(&path));
+    grant(&(crate::paths::real(&path)));
     let msg = serde_json::json!({ "path": path, "edit": edit.unwrap_or(false) });
     let icon = from
         .filter(|_| !crate::zoom::reduce_motion())
@@ -361,11 +361,11 @@ pub async fn read_document(window: Window, path: String) -> Result<Document, Str
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    check_granted(window.label(), Path::new(&path))?;
+    check_granted(window.label(), &(crate::paths::real(&path)))?;
     let reader = window.label() == LABEL;
     crate::jobs::blocking(move || {
-        let doc = read(Path::new(&path))?;
-        grant_links(Path::new(&path), &doc.body, reader);
+        let doc = read(&(crate::paths::real(&path)))?;
+        grant_links(&(crate::paths::real(&path)), &doc.body, reader);
         Ok(doc)
     })
     .await?
@@ -374,15 +374,24 @@ pub async fn read_document(window: Window, path: String) -> Result<Document, Str
 /// A .ts file can be video. Open it in its app if it is not text.
 #[tauri::command]
 pub async fn is_text_file(path: String) -> bool {
-    crate::jobs::blocking(move || {
-        use std::io::Read;
-        let mut head = Vec::with_capacity(SNIFF_BYTES);
-        fs::File::open(&path)
-            .and_then(|f| f.take(SNIFF_BYTES as u64).read_to_end(&mut head))
-            .is_ok_and(|_| decode(&head).is_ok())
-    })
-    .await
-    .unwrap_or(false)
+    // Decode once: the bridge string is not a path the file system knows.
+    let p = crate::paths::real(&path);
+    crate::jobs::blocking(move || is_text_path(&p))
+        .await
+        .unwrap_or(false)
+}
+
+/// The sync half, so callers holding a real path need no bridge round trip.
+fn is_text_path(path: &Path) -> bool {
+    use std::io::Read;
+    // Regular files only: opening a FIFO parks this thread until a writer shows up.
+    if !fs::symlink_metadata(path).is_ok_and(|m| m.is_file()) {
+        return false;
+    }
+    let mut head = Vec::with_capacity(SNIFF_BYTES);
+    fs::File::open(path)
+        .and_then(|f| f.take(SNIFF_BYTES as u64).read_to_end(&mut head))
+        .is_ok_and(|_| decode(&head).is_ok())
 }
 
 /// Drop a trailing odd byte.
@@ -507,8 +516,8 @@ pub async fn read_text(window: Window, path: String) -> Result<TextFile, String>
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    check_granted(window.label(), Path::new(&path))?;
-    crate::jobs::blocking(move || read_text_sync(Path::new(&path))).await?
+    check_granted(window.label(), &(crate::paths::real(&path)))?;
+    crate::jobs::blocking(move || read_text_sync(&(crate::paths::real(&path)))).await?
 }
 
 /// How a text file is stored. A save writes it back the same way.
@@ -619,8 +628,8 @@ pub async fn write_text(window: Window, path: String, text: String, rev: Option<
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    check_granted(window.label(), Path::new(&path))?;
-    crate::jobs::blocking(move || write_text_sync(Path::new(&path), &text, rev.as_deref())).await?
+    check_granted(window.label(), &(crate::paths::real(&path)))?;
+    crate::jobs::blocking(move || write_text_sync(&(crate::paths::real(&path)), &text, rev.as_deref())).await?
 }
 
 #[cfg(test)]
@@ -669,10 +678,17 @@ mod tests {
         let video = dir.join("clip.ts");
         fs::write(&video, [0x47, 0x40, 0x00, 0x10, 0x00, 0x00, 0xB0]).unwrap();
         assert!(read(&video).is_err());
-        let is_text =
-            |p: &Path| tauri::async_runtime::block_on(is_text_file(p.to_string_lossy().into()));
+        let is_text = |p: &Path| is_text_path(p);
         assert!(!is_text(&video));
         assert!(is_text(&le));
+        // The command decodes the bridge string before the sniff, so a name carrying
+        // raw bytes is judged by its content, not declared unreadable.
+        {
+            use std::os::unix::ffi::OsStrExt;
+            let raw = dir.join(std::ffi::OsStr::from_bytes(b"r\xff.md"));
+            fs::write(&raw, "hello").unwrap();
+            assert!(tauri::async_runtime::block_on(is_text_file(crate::paths::encode(&raw))));
+        }
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -748,7 +764,7 @@ mod tests {
         assert!(check_granted(LABEL, &other).is_err());
         grant_links(&doc, &read(&doc).unwrap().body, true);
         assert!(check_granted(LABEL, &other).is_ok());
-        assert!(check_granted(LABEL, Path::new("/etc/hosts")).is_ok());
+        assert!(check_granted(LABEL, &(crate::paths::real("/etc/hosts"))).is_ok());
         assert!(check_granted(LABEL, &secret).is_err());
         assert!(check_granted("main", &secret).is_ok());
         assert!(URLS.locked().contains("https://example.com/p"));
@@ -775,7 +791,7 @@ mod tests {
         let other = dir.join("photo.heic");
         fs::write(&other, "x").unwrap();
         assert!(read(&other).is_err());
-        assert!(read(Path::new("relative.md")).is_err());
+        assert!(read(&(crate::paths::real("relative.md"))).is_err());
         fs::create_dir(dir.join("folder.md")).unwrap();
         assert!(read(&dir.join("folder.md")).is_err());
         assert!(read(&dir.join("missing.md")).is_err());

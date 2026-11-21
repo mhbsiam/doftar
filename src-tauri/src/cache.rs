@@ -16,16 +16,29 @@ const UNMOUNT_CHECK_EVERY: Duration = Duration::from_secs(10);
 fn sweep() {
     let Some(root) = cache_root() else { return };
     let Ok(rd) = fs::read_dir(&root) else { return };
+    let session = session_root();
     for e in rd.flatten() {
         if e.metadata().is_ok_and(|m| m.is_dir()) {
-            prune(&e.path());
+            // Session previews sit two levels deeper: a device, then a kind. A drive
+            // that stays mounted for weeks would otherwise never be pruned.
+            if Some(&e.path()) == session.as_ref() {
+                for dev in fs::read_dir(e.path()).into_iter().flatten().flatten() {
+                    for kind in fs::read_dir(dev.path()).into_iter().flatten().flatten() {
+                        if kind.metadata().is_ok_and(|m| m.is_dir()) {
+                            prune(&kind.path());
+                        }
+                    }
+                }
+            } else {
+                prune(&e.path());
+            }
         }
     }
 }
 
 /// Devices of all mounted volumes, including mounts outside /Volumes.
 fn mounted_devices() -> Vec<u64> {
-    let mut paths = vec![PathBuf::from("/")];
+    let mut paths = vec![crate::paths::real("/")];
     if let Ok(rd) = fs::read_dir("/Volumes") {
         paths.extend(rd.flatten().map(|e| e.path()));
     }
@@ -57,14 +70,17 @@ fn mount_points() -> Vec<PathBuf> {
     buf.iter()
         .map(|s| {
             let name = unsafe { CStr::from_ptr(s.f_mntonname.as_ptr()) };
-            PathBuf::from(OsStr::from_bytes(name.to_bytes()))
+            crate::paths::real(OsStr::from_bytes(name.to_bytes()))
         })
         .collect()
 }
 
+/// From the kernel mount table, through the shared parser in fsops::list. Without it,
+/// every external drive's previews would look unmounted and be deleted. The plumbing
+/// filesystems count too: a tmpfs is still a mounted device.
 #[cfg(not(target_os = "macos"))]
 fn mount_points() -> Vec<PathBuf> {
-    Vec::new()
+    crate::fsops::mount_points()
 }
 
 fn drop_unmounted_in(root: &Path, mounted: &[u64]) {
@@ -84,6 +100,10 @@ pub fn make_private(dir: &Path) {
     let _ = fs::set_permissions(dir, fs::Permissions::from_mode(0o700));
 }
 
+#[cfg(not(target_os = "macos"))]
+pub fn exclude_from_backup(_dir: &Path) {}
+
+#[cfg(target_os = "macos")]
 pub fn exclude_from_backup(dir: &Path) {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
@@ -232,7 +252,7 @@ mod tests {
     #[test]
     fn volumes_mounted_outside_volumes_count_as_mounted() {
         // /dev is a separate file system, mounted outside /Volumes.
-        assert!(mount_points().iter().any(|p| p == Path::new("/dev")));
+        assert!(mount_points().iter().any(|p| p == crate::paths::real("/dev")));
         assert!(mounted_devices().contains(&fs::metadata("/dev").unwrap().dev()));
     }
 

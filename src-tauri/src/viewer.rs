@@ -3,14 +3,15 @@
 use crate::lock::Locked;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow, Window};
 
-use crate::thumbs::{cache_key, is_dataless, preview_dir, touch, wait_or_kill, SIPS};
+use crate::thumbs::{cache_key, is_dataless, preview_dir, touch};
+#[cfg(target_os = "macos")]
+use crate::thumbs::{wait_or_kill, SIPS};
 use crate::fly::{Landing, Picture};
 use crate::zoom::CssRect;
 
@@ -22,8 +23,14 @@ const EXTS: &[&str] = &[
     "heif", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2",
 ];
 /// Converted to PNG so transparency survives. The rest become JPEG.
+#[cfg(target_os = "macos")]
 const PNG_EXTS: &[&str] = &["png", "gif", "webp", "bmp", "ico", "tif", "tiff"];
+/// What the image crate decodes with the enabled features. RAW, HEIC, SVG and AVIF have
+/// no decoder here, so they are a permanent error and the viewer shows its message.
+#[cfg(not(target_os = "macos"))]
+const DECODABLE: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "tif", "tiff"];
 /// A RAW file from a big sensor decodes slowly.
+#[cfg(target_os = "macos")]
 const CONVERT_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Held while the window is looked up, made or marked ready. An open cannot then slip between the page listening and taking the opens it missed.
@@ -96,7 +103,7 @@ pub async fn open_image_viewer(
     let thumb = from
         .filter(|_| !crate::zoom::reduce_motion())
         .and_then(|_| crate::fly::thumb_for(&path));
-    let size = thumb.as_ref().and_then(|_| crate::fly::image_size(Path::new(&path)));
+    let size = thumb.as_ref().and_then(|_| crate::fly::image_size(&(crate::paths::real(&path))));
     let flown = thumb.is_some();
     crate::fly::set_opener(LABEL, from.map(|_| window.label().to_string()));
     let msg =
@@ -198,7 +205,8 @@ pub fn list_images(dir: String) -> Result<Vec<String>, String> {
     if crate::watcher::is_ejecting(&dir) {
         return Err("volume is being ejected".to_string());
     }
-    let rd = fs::read_dir(&dir).map_err(|e| e.to_string())?;
+    // The bridge string can hold private-use chars for raw bytes; read the real folder.
+    let rd = fs::read_dir(crate::paths::real(&dir)).map_err(|e| e.to_string())?;
     Ok(rd
         .flatten()
         .filter_map(|e| {
@@ -207,19 +215,22 @@ pub fn list_images(dir: String) -> Result<Vec<String>, String> {
             if hidden || !is_image(&path) || !fs::metadata(&path).is_ok_and(|m| m.is_file()) {
                 return None;
             }
-            Some(path.to_string_lossy().into_owned())
+            // The webview decodes bridge strings, so hand it one, not a lossy path.
+            Some(crate::paths::encode(&path))
         })
         .collect())
 }
 
-/// A copy of `path` that the webview can show, made with `sips`. Used for RAW files, HEIC that WebKit cannot decode, and files outside the asset scope.
+/// A copy of `path` that the webview can show: `sips` on macOS, the image crate on Linux.
+/// Used for files outside the asset scope; RAW and HEIC stay macOS-only.
 #[tauri::command]
 pub async fn viewer_image(path: String) -> Result<String, String> {
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+        // The bridge string can hold private-use chars for raw bytes; stat the real file.
+        let meta = fs::metadata(crate::paths::real(&path)).map_err(|e| e.to_string())?;
         let dir = preview_dir("viewer", &meta).ok_or_else(|| "no cache directory".to_string())?;
         convert(&dir, &path)
     })
@@ -227,20 +238,31 @@ pub async fn viewer_image(path: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// A huge file is refused rather than decoded into the app's own memory. thumbs.rs refuses at the same size.
+const MAX_SOURCE_BYTES: u64 = 256 * 1024 * 1024;
+
 fn convert(cache: &Path, path: &str) -> Result<String, String> {
-    let src = Path::new(path);
-    if !src.is_absolute() || !is_image(src) {
+    let src = crate::paths::real(path);
+    if !src.is_absolute() || !is_image(&(src)) {
         return Err("unsupported image type".into());
     }
-    let meta = fs::metadata(src).map_err(|e| e.to_string())?;
+    let meta = fs::metadata(&src).map_err(|e| e.to_string())?;
     if !meta.is_file() {
         return Err("not a file".into());
+    }
+    if meta.len() > MAX_SOURCE_BYTES {
+        return Err("the image is too large".into());
     }
     if is_dataless(&meta) {
         return Err("file is not downloaded".into());
     }
-    let png = PNG_EXTS.contains(&ext_of(src).as_str());
-    let key = cache_key(src, &meta, 0);
+    #[cfg(not(target_os = "macos"))]
+    if !DECODABLE.contains(&ext_of(&(src)).as_str()) {
+        return Err("this format can't be shown on Linux".into());
+    }
+    // Linux re-encodes everything to PNG, so transparency survives whatever the source was.
+    let png = as_png(&src);
+    let key = cache_key(&(src), &meta, 0);
     let out = cache.join(format!("{key}.{}", if png { "png" } else { "jpg" }));
     if out.exists() {
         touch(&out);
@@ -252,6 +274,29 @@ fn convert(cache: &Path, path: &str) -> Result<String, String> {
         std::process::id(),
         NEXT_TMP.fetch_add(1, Ordering::Relaxed)
     ));
+    render(&src, png, &tmp)?;
+    fs::rename(&tmp, &out).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })?;
+    Ok(out.to_string_lossy().into_owned())
+}
+
+/// Whether the copy becomes a PNG: macOS keeps JPEG sources as JPEG; Linux always writes PNG.
+fn as_png(src: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    return PNG_EXTS.contains(&ext_of(src).as_str());
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = src;
+        true
+    }
+}
+
+/// sips re-encodes out of process, with a timeout: a RAW file from a big sensor decodes slowly.
+#[cfg(target_os = "macos")]
+fn render(src: &Path, png: bool, tmp: &Path) -> Result<(), String> {
+    use std::process::{Command, Stdio};
     let mut cmd = Command::new(SIPS);
     if png {
         cmd.args(["-s", "format", "png"]);
@@ -261,20 +306,42 @@ fn convert(cache: &Path, path: &str) -> Result<String, String> {
     let mut child = cmd
         .arg(src)
         .arg("--out")
-        .arg(&tmp)
+        .arg(tmp)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| e.to_string())?;
     if !wait_or_kill(&mut child, CONVERT_TIMEOUT) || !tmp.exists() {
-        let _ = fs::remove_file(&tmp);
+        let _ = fs::remove_file(tmp);
         return Err("could not decode image".into());
     }
-    fs::rename(&tmp, &out).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        e.to_string()
-    })?;
-    Ok(out.to_string_lossy().into_owned())
+    Ok(())
+}
+
+/// The image crate decodes in process and writes PNG. The formats it cannot decode were
+/// refused in `convert`, so a decode error here is a broken file, not a missing format.
+#[cfg(not(target_os = "macos"))]
+fn render(src: &Path, _png: bool, tmp: &Path) -> Result<(), String> {
+    use image::ImageDecoder;
+    // Bake the EXIF orientation in: the copy drops metadata, and the webview shows the
+    // original with the orientation applied (see imgedit.rs).
+    let mut dec = image::ImageReader::open(src)
+        .map_err(|e| e.to_string())?
+        .with_guessed_format()
+        .map_err(|e| e.to_string())?
+        .into_decoder()
+        .map_err(|_| "could not decode image".to_string())?;
+    let orientation = dec.orientation().map_err(|_| "could not decode image".to_string())?;
+    let mut img = image::DynamicImage::from_decoder(dec)
+        .map_err(|_| "could not decode image".to_string())?;
+    img.apply_orientation(orientation);
+    let saved = img
+        .write_to(&mut fs::File::create(tmp).map_err(|e| e.to_string())?, image::ImageFormat::Png)
+        .map_err(|_| "couldn't write the image".to_string());
+    if saved.is_err() {
+        let _ = fs::remove_file(tmp);
+    }
+    saved
 }
 
 #[cfg(all(test, target_os = "macos"))]
@@ -307,7 +374,7 @@ mod tests {
         let mut found: Vec<String> = list_images(dir.to_string_lossy().into_owned())
             .unwrap()
             .into_iter()
-            .map(|p| Path::new(&p).file_name().unwrap().to_string_lossy().into_owned())
+            .map(|p| crate::paths::real(&p).file_name().unwrap().to_string_lossy().into_owned())
             .collect();
         found.sort();
         assert_eq!(found, ["B.JPG", "a.png", "c.heic"]);
@@ -335,6 +402,62 @@ mod tests {
         let txt = dir.join("notes.txt");
         fs::write(&txt, "hi").unwrap();
         assert!(convert(&cache, txt.to_str().unwrap()).is_err());
+        let broken = dir.join("broken.jpg");
+        fs::write(&broken, b"not an image").unwrap();
+        assert!(convert(&cache, broken.to_str().unwrap()).is_err());
+        assert!(!cache.exists() || fs::read_dir(&cache).unwrap().all(|e| {
+            !e.unwrap().file_name().to_string_lossy().ends_with(".tmp")
+        }));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+/// The image crate renderer, where the sips tests do not apply.
+#[cfg(all(test, not(target_os = "macos")))]
+mod linux_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    const PNG: &[u8] = &[
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x08, 0x06, 0x00, 0x00, 0x00, 0xc4,
+        0x0f, 0xbe, 0x8b, 0x00, 0x00, 0x00, 0x12, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x38,
+        0x61, 0x63, 0xf3, 0x1f, 0x1f, 0x66, 0x18, 0x19, 0x0a, 0x00, 0x0f, 0xbe, 0x8f, 0xc1, 0x56,
+        0x80, 0x1f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ];
+
+    fn scratch(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("doftar-viewer-lin-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn converts_once_and_reuses_the_copy() {
+        let dir = scratch("convert");
+        let cache = dir.join("cache");
+        let src = dir.join("pic.tiff");
+        fs::write(&src, PNG).unwrap();
+        let out = convert(&cache, src.to_str().unwrap()).unwrap();
+        assert!(out.ends_with(".png"));
+        assert!(fs::read(&out).unwrap().starts_with(&[0x89, b'P', b'N', b'G']));
+        assert_eq!(convert(&cache, src.to_str().unwrap()).unwrap(), out);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn refuses_what_it_cannot_decode() {
+        let dir = scratch("bad");
+        let cache = dir.join("cache");
+        // A PNG renamed to a RAW or HEIC suffix still reads as that viewer type,
+        // so the refusal below is the format gate, not the bytes.
+        let raw = dir.join("photo.cr2");
+        fs::write(&raw, PNG).unwrap();
+        assert!(convert(&cache, raw.to_str().unwrap()).is_err());
+        let heic = dir.join("photo.heic");
+        fs::write(&heic, PNG).unwrap();
+        assert!(convert(&cache, heic.to_str().unwrap()).is_err());
         let broken = dir.join("broken.jpg");
         fs::write(&broken, b"not an image").unwrap();
         assert!(convert(&cache, broken.to_str().unwrap()).is_err());

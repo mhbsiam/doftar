@@ -1,6 +1,8 @@
-//! Finder tags. They live in the `_kMDItemUserTags` attribute: a binary plist of "Name\n<colour>" strings, oldest first.
-//! Finder copies the newest colour to the label bits of the Finder info.
-//! A listing has those bits already, so only labelled items get the slow attribute read.
+//! Tags. On macOS they live in the `_kMDItemUserTags` attribute: a binary plist of "Name\n<colour>" strings, oldest first.
+//! Finder copies the newest colour to the label bits of the Finder info, and a listing has those
+//! bits already, so only labelled items get the slow attribute read. On Linux they live in the
+//! freedesktop `user.xdg.tags` attribute: tag names joined with ";". A stored name carries no
+//! colour; the app's colour tags are semantic names, so reading one back restores its colour.
 
 use crate::lock::Locked;
 use serde::{Deserialize, Serialize};
@@ -161,8 +163,142 @@ pub fn read(path: &Path) -> Vec<Tag> {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn read(_path: &Path) -> Vec<Tag> {
-    Vec::new()
+mod sys {
+    use std::ffi::{CStr, CString};
+    use std::io;
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
+
+    pub const TAGS: &CStr = c"user.xdg.tags";
+
+    pub fn c_path(path: &Path) -> io::Result<CString> {
+        CString::new(path.as_os_str().as_bytes())
+            .map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))
+    }
+
+    /// Returns `Ok(None)` if the item has no such attribute.
+    pub fn get(p: &CStr, name: &CStr) -> io::Result<Option<Vec<u8>>> {
+        let mut buf = vec![0u8; 1024];
+        for _ in 0..3 {
+            // SAFETY: valid C strings and a buffer of the length given.
+            let n = unsafe {
+                libc::lgetxattr(p.as_ptr(), name.as_ptr(), buf.as_mut_ptr().cast(), buf.len())
+            };
+            if n >= 0 {
+                buf.truncate(n as usize);
+                return Ok(Some(buf));
+            }
+            let err = io::Error::last_os_error();
+            match err.raw_os_error() {
+                // Linux names a missing attribute ENODATA where macOS says ENOATTR.
+                Some(libc::ENODATA) => return Ok(None),
+                Some(libc::ERANGE) => {
+                    // SAFETY: a null buffer asks for the value's size.
+                    let need = unsafe {
+                        libc::lgetxattr(p.as_ptr(), name.as_ptr(), std::ptr::null_mut(), 0)
+                    };
+                    if need < 0 {
+                        return Err(io::Error::last_os_error());
+                    }
+                    buf.resize(need as usize, 0);
+                }
+                _ => return Err(err),
+            }
+        }
+        Err(io::Error::from(io::ErrorKind::Other))
+    }
+
+    pub fn set(p: &CStr, name: &CStr, value: &[u8]) -> io::Result<()> {
+        // SAFETY: valid C strings and a value of the length given.
+        let rc = unsafe {
+            libc::lsetxattr(p.as_ptr(), name.as_ptr(), value.as_ptr().cast(), value.len(), 0)
+        };
+        if rc == 0 { Ok(()) } else { Err(io::Error::last_os_error()) }
+    }
+
+    pub fn remove(p: &CStr, name: &CStr) -> io::Result<()> {
+        // SAFETY: valid C strings.
+        let rc = unsafe { libc::lremovexattr(p.as_ptr(), name.as_ptr()) };
+        if rc == 0 {
+            return Ok(());
+        }
+        let err = io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::ENODATA) { Ok(()) } else { Err(err) }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn read(path: &Path) -> Vec<Tag> {
+    let Ok(p) = sys::c_path(path) else { return Vec::new() };
+    // No attribute, or a filesystem without xattrs, means an untagged item.
+    match sys::get(&p, sys::TAGS) {
+        Ok(Some(bytes)) => parse_names(&bytes),
+        _ => Vec::new(),
+    }
+}
+
+/// Like `read`, but a failing attribute read is an error: `edit_tags` must not mistake
+/// it for "untagged" and overwrite the tags that are really there.
+#[cfg(not(target_os = "macos"))]
+fn read_strict(path: &Path) -> std::io::Result<Vec<Tag>> {
+    let p = sys::c_path(path)?;
+    match sys::get(&p, sys::TAGS)? {
+        Some(bytes) => Ok(parse_names(&bytes)),
+        None => Ok(Vec::new()),
+    }
+}
+
+/// A listing's per-entry read. The answer is remembered under the bridge path the
+/// frontend reuses for `scan_tags`, so the first tag view need not read the attribute
+/// all over again.
+pub fn read_cached(path: &Path, bridge: &str) -> Vec<Tag> {
+    let tags = read(path);
+    remember_bridge(path, bridge, &tags);
+    tags
+}
+
+#[cfg(not(target_os = "macos"))]
+fn remember_bridge(path: &Path, bridge: &str, tags: &[Tag]) {
+    let Some(ctime) = ctime_of(path) else { return };
+    let mut c = cache().locked();
+    if c.len() >= CACHE_MAX {
+        c.clear();
+    }
+    c.insert(bridge.to_string(), (ctime, tags.to_vec()));
+}
+
+#[cfg(target_os = "macos")]
+fn remember_bridge(_path: &Path, _bridge: &str, _tags: &[Tag]) {}
+
+/// A colour tag is stored by name only. The name carries its colour back in.
+#[cfg(not(target_os = "macos"))]
+fn color_of_name(name: &str) -> u8 {
+    LABEL_NAMES
+        .iter()
+        .position(|l| !l.is_empty() && l.eq_ignore_ascii_case(name))
+        .map_or(0, |c| c as u8)
+}
+
+/// The freedesktop `user.xdg.tags` value: names joined with ";". Unknown names read as colourless.
+#[cfg(not(target_os = "macos"))]
+fn parse_names(bytes: &[u8]) -> Vec<Tag> {
+    String::from_utf8_lossy(bytes)
+        .split(';')
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(|name| Tag {
+            name: name.to_string(),
+            color: color_of_name(name),
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "macos"))]
+fn encode_names(tags: &[Tag]) -> Vec<u8> {
+    tags.iter()
+        .map(|t| t.name.as_bytes())
+        .collect::<Vec<_>>()
+        .join(&[b';'][..])
 }
 
 /// Replace the tags. Set the Finder label to the newest coloured tag. Otherwise Finder shows a removed colour.
@@ -192,9 +328,19 @@ fn write(path: &Path, tags: &[Tag]) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Replace the tags. An empty list removes the attribute.
 #[cfg(not(target_os = "macos"))]
-fn write(_path: &Path, _tags: &[Tag]) -> std::io::Result<()> {
-    Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
+fn write(path: &Path, tags: &[Tag]) -> std::io::Result<()> {
+    // A ";" would split the name in two when the attribute is read back.
+    if tags.iter().any(|t| t.name.contains(';')) {
+        return Err(std::io::Error::from(std::io::ErrorKind::InvalidInput));
+    }
+    let p = sys::c_path(path)?;
+    if tags.is_empty() {
+        sys::remove(&p, sys::TAGS)
+    } else {
+        sys::set(&p, sys::TAGS, &encode_names(tags))
+    }
 }
 
 fn same_name(a: &str, b: &str) -> bool {
@@ -226,6 +372,9 @@ pub struct TagEdit {
     pub errors: Vec<String>,
 }
 
+/// Serializes the read-modify-write of an item's tags.
+static EDIT_LOCK: Mutex<()> = Mutex::new(());
+
 #[tauri::command]
 pub async fn edit_tags(
     paths: Vec<String>,
@@ -233,22 +382,35 @@ pub async fn edit_tags(
     remove: Option<String>,
 ) -> Result<TagEdit, String> {
     // Finder knows colors 0-7. A larger value spills into the Finder flags.
-    // A name is stored as "name\ncolor". A newline would split it.
+    // A name is stored as "name\ncolor". A newline would split it, a ";" would
+    // split the attribute value.
     let add = match add {
-        Some(t) if t.name.trim().is_empty() || t.name.contains('\n') => {
-            return Err("A tag name can't be empty or hold a line break".to_string())
+        Some(t) if t.name.trim().is_empty() || t.name.contains('\n') || t.name.contains(';') => {
+            return Err("A tag name can't be empty, or hold a line break or \";\"".to_string())
         }
-        add => add.map(|t| Tag { color: t.color.min(7), ..t }),
+        // Store the name as it reads back: trimmed, within the color range.
+        add => add.map(|t| Tag { name: t.name.trim().to_string(), color: t.color.min(7) }),
     };
     crate::jobs::blocking(move || {
+        // Two windows editing the same item must not interleave read-modify-write.
+        let _guard = EDIT_LOCK.locked();
         let mut out = TagEdit { tags: HashMap::new(), errors: Vec::new() };
         for path in paths {
-            let p = Path::new(&path);
-            let before = read(p);
+            let p = crate::paths::real(&path);
+            // A failing attribute read must not pass for "untagged", or the write
+            // below would erase the tags that are really there.
+            let before = match read_strict(&p) {
+                Ok(tags) => tags,
+                Err(e) => {
+                    out.errors.push(format!("\"{}\": {e}", crate::fsops::label(&(p))));
+                    out.tags.insert(path, Vec::new());
+                    continue;
+                }
+            };
             let after = edited(before.clone(), add.as_ref(), remove.as_deref());
             if after != before {
-                if let Err(e) = write(p, &after) {
-                    out.errors.push(format!("\"{}\": {e}", crate::fsops::label(p)));
+                if let Err(e) = write(&(p), &after) {
+                    out.errors.push(format!("\"{}\": {e}", crate::fsops::label(&(p))));
                     out.tags.insert(path, before);
                     continue;
                 }
@@ -276,7 +438,7 @@ fn ctime_of(path: &Path) -> Option<(i64, i64)> {
 }
 
 fn remember(path: &str, tags: &[Tag]) {
-    let Some(ctime) = ctime_of(Path::new(path)) else { return };
+    let Some(ctime) = ctime_of(&(crate::paths::real(path))) else { return };
     let mut c = cache().locked();
     if c.len() >= CACHE_MAX {
         c.clear();
@@ -290,7 +452,7 @@ pub async fn scan_tags(paths: Vec<String>) -> Result<HashMap<String, Vec<Tag>>, 
     crate::jobs::blocking(move || {
         let mut found = HashMap::new();
         for path in paths {
-            let Some(ctime) = ctime_of(Path::new(&path)) else { continue };
+            let Some(ctime) = ctime_of(&(crate::paths::real(&path))) else { continue };
             let hit = cache()
                 .locked()
                 .get(&path)
@@ -299,7 +461,7 @@ pub async fn scan_tags(paths: Vec<String>) -> Result<HashMap<String, Vec<Tag>>, 
             let tags = match hit {
                 Some(tags) => tags,
                 None => {
-                    let tags = read(Path::new(&path));
+                    let tags = read(&(crate::paths::real(&path)));
                     let mut c = cache().locked();
                     if c.len() >= CACHE_MAX {
                         c.clear();
@@ -400,6 +562,38 @@ mod tests {
         write(&f, &[]).unwrap();
         assert!(read(&f).is_empty());
         assert!(sys::get(&p, sys::FINDER_INFO).unwrap().is_none(), "an all-zero Finder info is dropped");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn parses_xattr_tags_and_restores_colours() {
+        assert_eq!(
+            parse_names(b"Important;TODO stuff"),
+            vec![tag("Important", 0), tag("TODO stuff", 0)]
+        );
+        assert_eq!(parse_names(b"Red;"), vec![tag("Red", 6)]);
+        assert!(parse_names(b";").is_empty());
+        assert_eq!(encode_names(&[tag("Red", 6), tag("Work", 0)]), b"Red;Work");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn write_sets_and_clears_xattr_tags() {
+        let dir = std::env::temp_dir().join(format!("wf-tags-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("a.txt");
+        std::fs::write(&f, "x").unwrap();
+        let tags = vec![tag("Red", 6), tag("Work", 0)];
+        if let Err(e) = write(&f, &tags) {
+            // Some filesystems have no user xattrs. The commands tolerate that; so does this test.
+            assert_eq!(e.raw_os_error(), Some(libc::EOPNOTSUPP), "{e}");
+        } else {
+            assert_eq!(read(&f), tags);
+            write(&f, &[]).unwrap();
+            assert!(read(&f).is_empty());
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

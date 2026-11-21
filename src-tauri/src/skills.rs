@@ -159,7 +159,7 @@ pub async fn create_skill(place: String, name: String) -> Result<String, String>
 
 /// True if some agent already has the skill. Only such a skill can be linked. Otherwise any folder with a SKILL.md could be planted into an agent's skills.
 fn is_listed(home: &Path, skill: &Path) -> bool {
-    PLACES.iter().any(|p| read_place(&home.join(p.2)).iter().any(|s| Path::new(&s.real) == skill))
+    PLACES.iter().any(|p| read_place(&home.join(p.2)).iter().any(|s| crate::paths::real(&s.real) == skill))
 }
 
 #[tauri::command]

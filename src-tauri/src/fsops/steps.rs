@@ -56,7 +56,7 @@ pub(super) fn move_exact(from: &Path, to: &Path, job: &Job) -> Result<(), String
 
 pub(super) fn same_item(path: &str, id: &Option<String>) -> Result<(), String> {
     match id {
-        Some(id) if exists(Path::new(path)) && jobs::file_id(Path::new(path)).as_ref() != Some(id) => {
+        Some(id) if exists(&(crate::paths::real(path))) && jobs::file_id(&(crate::paths::real(path))).as_ref() != Some(id) => {
             Err("it has been replaced by another item since".to_string())
         }
         _ => Ok(()),
@@ -67,19 +67,19 @@ pub(super) fn apply_step(step: &Step, job: &Job) -> Result<Option<Step>, String>
     match step {
         Step::Move { from, to, id } => {
             same_item(from, id)?;
-            move_exact(Path::new(from), Path::new(to), job)?;
+            move_exact(&crate::paths::real(from), &crate::paths::real(to), job)?;
             Ok(Some(Step::moved(to.clone(), from.clone())))
         }
         Step::Copy { from, to } => {
-            if exists(Path::new(to)) {
+            if exists(&(crate::paths::real(to))) {
                 return Err(format!(
                     "An item named \"{}\" already exists",
-                    label(Path::new(to))
+                    label(&(crate::paths::real(to)))
                 ));
             }
-            copy_item(Path::new(from), Path::new(to), job).map_err(|e| {
+            copy_item(&crate::paths::real(from), &crate::paths::real(to), job).map_err(|e| {
                 if e.kind() != std::io::ErrorKind::AlreadyExists {
-                    remove_path(Path::new(to));
+                    remove_path(&(crate::paths::real(to)));
                 }
                 strerr(e)
             })?;
@@ -91,7 +91,7 @@ pub(super) fn apply_step(step: &Step, job: &Job) -> Result<Option<Step>, String>
                 Ok(trashed) => Ok(trashed.map(|t| Step::moved(t, path.clone()))),
                 // No Trash on the volume. Set the item aside for redo.
                 Err(e) if e == NO_TRASH => {
-                    let aside = set_aside(Path::new(path)).map_err(strerr)?;
+                    let aside = set_aside(&(crate::paths::real(path))).map_err(strerr)?;
                     Ok(Some(Step::moved(path_str(&aside), path.clone())))
                 }
                 Err(e) => Err(e),
@@ -122,7 +122,7 @@ pub(super) fn run_steps(steps: &[Step], job: &JobGuard) -> OpResult {
         }
         let (Step::Move { to: subject, .. } | Step::Copy { to: subject, .. } | Step::Trash { path: subject, .. }) =
             step;
-        job.set_current(&label(Path::new(subject)));
+        job.set_current(&label(&(crate::paths::real(subject))));
         match apply_step(step, job) {
             Ok(Some(inverse)) => res.inverse.push(inverse),
             Ok(None) => {}
@@ -132,7 +132,7 @@ pub(super) fn run_steps(steps: &[Step], job: &JobGuard) -> OpResult {
                 break;
             }
             Err(e) => {
-                res.errors.push(format!("\"{}\": {e}", label(Path::new(subject))));
+                res.errors.push(format!("\"{}\": {e}", label(&(crate::paths::real(subject)))));
                 res.failed.push(step.clone());
             }
         }
@@ -171,16 +171,16 @@ pub(super) fn validate_name(name: &str) -> Result<(), String> {
 #[tauri::command(async)]
 /// True when another item holds the name, by the volume's own rules for case and Unicode spelling.
 pub fn rename_taken(from: String, to: String) -> bool {
-    let dest = Path::new(&to);
-    exists(dest) && !same_file_case_only(Path::new(&from), dest)
+    let dest = crate::paths::real(&to);
+    exists(&dest) && !same_file_case_only(&crate::paths::real(&from), &dest)
 }
 
 #[tauri::command(async)]
 /// Returns the step that undoes the rename.
 pub fn rename_path(from: String, to: String) -> Result<Step, String> {
-    let dest = Path::new(&to);
-    validate_name(&label(dest))?;
-    if Path::new(&from).parent() != dest.parent() {
+    let dest = crate::paths::real(&to);
+    validate_name(&label(&(dest)))?;
+    if crate::paths::real(&from).parent() != dest.parent() {
         return Err("A name can't contain a slash (/) or colon (:)".to_string());
     }
     if rename_taken(from.clone(), to.clone()) {
@@ -190,10 +190,10 @@ pub fn rename_path(from: String, to: String) -> Result<Step, String> {
             .unwrap_or_default();
         return Err(format!("An item named \"{}\" already exists", name));
     }
-    guard::check(Path::new(&from)).map_err(|e| format!("\"{}\": {e}", label(Path::new(&from))))?;
-    rename_new(Path::new(&from), dest).map_err(|e| {
+    guard::check(&(crate::paths::real(&from))).map_err(|e| format!("\"{}\": {e}", label(&(crate::paths::real(&from)))))?;
+    rename_new(&crate::paths::real(&from), &dest).map_err(|e| {
         if e.kind() == std::io::ErrorKind::AlreadyExists {
-            format!("An item named \"{}\" already exists", label(dest))
+            format!("An item named \"{}\" already exists", label(&(dest)))
         } else {
             strerr(e)
         }
@@ -204,8 +204,8 @@ pub fn rename_path(from: String, to: String) -> Result<Step, String> {
 #[tauri::command(async)]
 /// Returns the step that undoes the new folder.
 pub fn create_dir(parent: String) -> Result<Step, String> {
-    let p = Path::new(&parent);
-    let name = unique_name(p, "New folder", "");
+    let p = crate::paths::real(&parent);
+    let name = unique_name(&(p), "New folder", "");
     let full = p.join(&name);
     fs::create_dir(&full).map_err(strerr)?;
     Ok(Step::trash(path_str(&full)))
@@ -214,8 +214,8 @@ pub fn create_dir(parent: String) -> Result<Step, String> {
 #[tauri::command(async)]
 /// Returns the step that undoes the new file.
 pub fn create_file(parent: String) -> Result<Step, String> {
-    let p = Path::new(&parent);
-    let name = unique_name(p, "New Text Document", ".txt");
+    let p = crate::paths::real(&parent);
+    let name = unique_name(&(p), "New Text Document", ".txt");
     let full = p.join(&name);
     // `create_new` fails on a symlink in the way. It does not write through it.
     fs::OpenOptions::new()
@@ -233,8 +233,8 @@ pub async fn create_text_file(parent: String, base: String, ext: String, text: S
         use std::io::Write;
         // Accept a name only. A path such as "../x" can escape `parent`.
         validate_name(&format!("{base}{ext}"))?;
-        let p = Path::new(&parent);
-        let full = p.join(unique_name(p, &base, &ext));
+        let p = crate::paths::real(&parent);
+        let full = p.join(unique_name(&(p), &base, &ext));
         // Check the new file, not `parent`. Home folders such as Downloads are protected.
         guard::check(&full)?;
         let mut f = fs::OpenOptions::new().write(true).create_new(true).open(&full).map_err(strerr)?;

@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 
-use crate::fsops::{is_plain_dir, label, partial_path, path_str, rename_excl, split_ext, unique_name};
+use crate::fsops::{is_plain_dir, label, partial_path, path_str, rename_excl, unique_name};
 use crate::jobs::{self, Job, OpResult, Progress, Step};
 use crate::quarantine;
 
@@ -107,14 +107,44 @@ pub fn compress_sync(paths: &[String], job: &Job) -> OpResult {
 
     let partial = partial_path(dir);
     let mut stage: Option<PathBuf> = None;
-    let mut cmd = Command::new("/usr/bin/ditto");
-    cmd.args(["-c", "-k", "--sequesterRsrc"]);
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = Command::new("/usr/bin/ditto");
+        c.args(["-c", "-k", "--sequesterRsrc"]);
+        c
+    };
+    // zip stores the names it's given, so it runs in `dir` and takes bare item names.
+    #[cfg(not(target_os = "macos"))]
+    let mut cmd = {
+        // -y keeps symlinks as links instead of following them into the archive.
+        let mut c = Command::new("zip");
+        c.args(["-q", "-r", "-y"]).arg(&partial).arg("--").current_dir(dir);
+        c
+    };
     if paths.len() == 1 {
-        // For a file, --keepParent adds the containing folder. Use it for folders only.
-        if first.is_dir() {
-            cmd.arg("--keepParent");
+        #[cfg(target_os = "macos")]
+        {
+            // For a file, --keepParent adds the containing folder. Use it for folders only.
+            if first.is_dir() {
+                cmd.arg("--keepParent");
+            }
+            cmd.arg(first);
         }
-        cmd.arg(first);
+        #[cfg(not(target_os = "macos"))]
+        {
+            // The bare name rides as raw bytes — a display label would mojibake a
+            // name that is not UTF-8, and zip would store it wrong or not at all.
+            let real = crate::paths::real(first);
+            match real.file_name() {
+                Some(n) => {
+                    cmd.arg(n);
+                }
+                None => {
+                    res.errors.push(format!("\"{}\": has no name", label(first)));
+                    return res;
+                }
+            }
+        }
     } else {
         // ditto takes one source. Clone the items into a staging folder first.
         let staging = partial_path(dir);
@@ -123,29 +153,51 @@ pub fn compress_sync(paths: &[String], job: &Job) -> OpResult {
             return res;
         }
         for p in paths {
-            let src = Path::new(p);
-            let target = staging.join(label(src));
+            let src = crate::paths::real(p);
+            // The staged copy keeps the real bytes of its name, so two items that only
+            // look alike in display form do not collide here.
+            let Some(base) = src.file_name().map(|n| n.to_os_string()) else {
+                res.errors.push(format!("\"{}\": has no name", label(&src)));
+                return res;
+            };
+            let target = staging.join(&base);
             if fs::symlink_metadata(&target).is_ok() {
-                res.errors.push(format!("\"{}\": another item has the same name", label(src)));
+                res.errors.push(format!("\"{}\": another item has the same name", label(&(src))));
                 remove_any(&staging);
                 return res;
             }
             let mut cp = Command::new("/bin/cp");
-            cp.arg("-cR").arg(src).arg(&target);
+            #[cfg(target_os = "macos")]
+            cp.arg("-cR");
+            #[cfg(not(target_os = "macos"))]
+            cp.arg("-aR");
+            cp.arg(&src).arg(&target);
             if let Err(e) = run_cancellable(cp, job) {
                 remove_any(&staging);
                 match e {
                     RunError::Cancelled => res.cancelled = true,
                     RunError::Failed(_) => {
-                        res.errors.push(format!("\"{}\": couldn't be read", label(src)))
+                        res.errors.push(format!("\"{}\": couldn't be read", label(&(src))))
                     }
                 }
                 return res;
             }
         }
+        #[cfg(target_os = "macos")]
         cmd.arg(&staging);
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Inside the staging folder the copies have the real bytes of their names.
+            cmd.current_dir(&staging);
+            for p in paths {
+                if let Some(n) = crate::paths::real(p).file_name() {
+                    cmd.arg(n);
+                }
+            }
+        }
         stage = Some(staging);
     }
+    #[cfg(target_os = "macos")]
     cmd.arg(&partial);
 
     let outcome = run_cancellable(cmd, job);
@@ -177,9 +229,64 @@ const TAR_SUFFIXES: [&str; 15] = [
     ".7z", ".rar", ".iso", ".cab", ".xar", ".cpio", ".lzh", ".lha",
 ];
 
+/// What GNU tar reads. The rest of TAR_SUFFIXES needs libarchive.
+const TAR_CORE: [&str; 7] = [".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".tar"];
+
+/// True once per run when `prog` is on PATH.
+#[cfg(not(target_os = "macos"))]
+fn have(prog: &str) -> bool {
+    use std::sync::Mutex;
+    static CACHE: Mutex<Option<std::collections::HashMap<String, bool>>> = Mutex::new(None);
+    let mut c = CACHE.lock().unwrap();
+    let map = c.get_or_insert_with(std::collections::HashMap::new);
+    *map.entry(prog.to_string()).or_insert_with(|| {
+        std::env::var_os("PATH").is_some_and(|p| {
+            std::env::split_paths(&p).any(|d| {
+                let f = d.join(prog);
+                f.is_file()
+                    && f.metadata().is_ok_and(|m| {
+                        use std::os::unix::fs::PermissionsExt;
+                        m.permissions().mode() & 0o111 != 0
+                    })
+            })
+        })
+    })
+}
+
+/// The tar binary that can read `name`. macOS always uses the bundled bsdtar;
+/// Linux uses GNU tar for tar formats and `bsdtar` (libarchive) for the rest.
+fn tar_tool(name: &str) -> Option<&'static str> {
+    let n = name.to_lowercase();
+    #[cfg(target_os = "macos")]
+    {
+        TAR_SUFFIXES.iter().any(|s| n.ends_with(s)).then_some("/usr/bin/tar")
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if TAR_CORE.iter().any(|s| n.ends_with(s)) {
+            Some("/usr/bin/tar")
+        } else if TAR_SUFFIXES.iter().any(|s| n.ends_with(s)) && have("bsdtar") {
+            Some("bsdtar")
+        } else {
+            None
+        }
+    }
+}
+
 pub fn is_extractable(name: &str) -> bool {
     let n = name.to_lowercase();
-    n.ends_with(".zip") || TAR_SUFFIXES.iter().any(|s| n.ends_with(s))
+    if n.ends_with(".zip") {
+        #[cfg(not(target_os = "macos"))]
+        return have("unzip");
+        #[cfg(target_os = "macos")]
+        return true;
+    }
+    tar_tool(&n).is_some()
+}
+
+#[tauri::command]
+pub fn archive_extractable(name: String) -> bool {
+    is_extractable(&name)
 }
 
 fn escapes_destination(entry: &str) -> bool {
@@ -220,18 +327,21 @@ fn listing(cmd: &mut Command) -> Option<String> {
 }
 
 /// The long listing marks symlinks with `l`. A listing that fails or does not match the names is unsafe.
-fn lists_escaping_entries(archive: &Path, zip: bool) -> bool {
+fn lists_escaping_entries(archive: &Path, name: &str) -> bool {
+    let zip = name.to_lowercase().ends_with(".zip");
     let (names, long) = if zip {
         (
-            listing(Command::new("/usr/bin/unzip").arg("-Z1").arg(archive)),
+            listing(Command::new("unzip").arg("-Z1").arg(archive)),
             // With a pattern, zipinfo prints only the entry lines.
-            listing(Command::new("/usr/bin/unzip").arg("-Zs").arg(archive).arg("*")),
+            listing(Command::new("unzip").arg("-Zs").arg(archive).arg("*")),
+        )
+    } else if let Some(tool) = tar_tool(name) {
+        (
+            listing(Command::new(tool).arg("-tf").arg(archive)),
+            listing(Command::new(tool).arg("-tvf").arg(archive)),
         )
     } else {
-        (
-            listing(Command::new("/usr/bin/tar").arg("-tf").arg(archive)),
-            listing(Command::new("/usr/bin/tar").arg("-tvf").arg(archive)),
-        )
+        (None, None)
     };
     let (Some(names), Some(long)) = (names, long) else { return true };
     let names: Vec<&str> = names.lines().collect();
@@ -269,18 +379,42 @@ fn tidy(name: &str) -> String {
     n.trim_end_matches('/').to_string()
 }
 
-/// One line of `tar -tv`: the type letter, the size before the date, and the name after the time or year.
-fn parse_tar_line(line: &str) -> Option<ArchiveEntry> {
+/// Where a `tar -tv` date starts and how many words it is. BSD prints "Oct 22 12:34"
+/// (3 words), GNU prints "2026-11-14 03:32" (2). The size is the word before it.
+fn tar_date_span(words: &[&str]) -> Option<(usize, usize)> {
     const MONTHS: [&str; 12] =
         ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let iso_date = |w: &str| {
+        let mut p = w.split('-');
+        matches!(p.next(), Some(y) if y.len() == 4 && y.parse::<u32>().is_ok())
+            && matches!(p.next(), Some(m) if m.len() == 2 && m.parse::<u8>().is_ok_and(|n| (1..=12).contains(&n)))
+            && matches!(p.next(), Some(d) if d.len() == 2 && d.parse::<u8>().is_ok_and(|n| (1..=31).contains(&n)))
+            && p.next().is_none()
+    };
+    let iso_time = |w: &str| {
+        w.len() >= 5 && w.split(':').count() >= 2 && w.split(':').all(|t| t.parse::<u8>().is_ok())
+    };
+    (3..words.len().saturating_sub(2)).find_map(|i| {
+        if MONTHS.contains(&words[i])
+            && words[i + 1].parse::<u8>().is_ok_and(|n| (1..=31).contains(&n))
+        {
+            Some((i, 3))
+        } else if iso_date(words[i]) && iso_time(words[i + 1]) {
+            Some((i, 2))
+        } else {
+            None
+        }
+    })
+}
+
+/// One line of `tar -tv`: the type letter, the size before the date, and the name after the time or year.
+fn parse_tar_line(line: &str) -> Option<ArchiveEntry> {
     let words: Vec<&str> = line.split_whitespace().collect();
-    let at = (4..words.len().saturating_sub(2)).find(|&i| {
-        MONTHS.contains(&words[i]) && words[i + 1].parse::<u8>().is_ok_and(|n| (1..=31).contains(&n))
-    })?;
+    let (at, span) = tar_date_span(&words)?;
     let size = words[at - 1].parse().ok()?;
-    // The name starts after month, day and time. Cut it from the line, because it can hold spaces.
+    // The name starts after the date. Cut it from the line, because it can hold spaces.
     let mut rest = line;
-    for w in &words[..at + 3] {
+    for w in &words[..at + span] {
         rest = rest[rest.find(w)? + w.len()..].trim_start();
     }
     let name = rest.split(" -> ").next().unwrap_or(rest);
@@ -308,7 +442,10 @@ fn list_sync(archive: &Path) -> Result<ArchiveListing, String> {
     } else {
         use std::io::{BufRead, BufReader};
         // Read line by line and stop tar at the limit. A huge archive then costs neither memory nor minutes.
-        let mut child = Command::new("/usr/bin/tar")
+        let Some(tool) = tar_tool(&name) else {
+            return Err("Can't read the archive".to_string());
+        };
+        let mut child = Command::new(tool)
             .env("LC_ALL", "C")
             .arg("-tvf")
             .arg(archive)
@@ -336,7 +473,7 @@ fn list_sync(archive: &Path) -> Result<ArchiveListing, String> {
 /// What an archive holds, without extracting it. Names are text only and never touch the disk.
 #[tauri::command]
 pub async fn archive_list(path: String) -> Result<ArchiveListing, String> {
-    crate::jobs::blocking(move || list_sync(Path::new(&path))).await?
+    crate::jobs::blocking(move || list_sync(&(crate::paths::real(&path)))).await?
 }
 
 /// Never replaces an item that takes the name first. Tries the next free name.
@@ -344,6 +481,47 @@ fn place_unique(from: &Path, dir: &Path, base: &str, ext: &str) -> std::io::Resu
     let mut tries = 0;
     loop {
         let target = dir.join(unique_name(dir, base, ext));
+        match rename_excl(from, &target) {
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && tries < 100 => tries += 1,
+            done => return done.map(|()| target),
+        }
+    }
+}
+
+/// The raw-bytes twin of `place_unique`: the moved item keeps its own name whole —
+/// a name that is not UTF-8 must not come out as mojibake after an extract.
+/// Candidates follow `place_unique`/`unique_name`: the name, then "name (2)", "name (3)"…
+fn place_unique_os(from: &Path, dir: &Path, plain_dir: bool) -> std::io::Result<PathBuf> {
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    let full = from.file_name().unwrap_or_else(|| from.as_os_str());
+    let bytes = full.as_bytes();
+    // Where the extension starts, by split_ext's rules on bytes: an extension is text,
+    // so a non-text tail belongs to the stem.
+    let ext_start = bytes
+        .iter()
+        .rposition(|&b| b == b'.')
+        .filter(|&i| i > 0 && !plain_dir)
+        .filter(|&i| std::str::from_utf8(&bytes[i + 1..]).is_ok_and(crate::fsops::plausible_ext))
+        .map(|i| {
+            // "x.tar.gz" keeps the pair together when the stem ends in .tar.
+            let stem = &bytes[..i];
+            match stem.iter().rposition(|&b| b == b'.') {
+                Some(j) if j > 0 && stem[j + 1..].eq_ignore_ascii_case(b"tar") => j,
+                _ => i,
+            }
+        });
+    let (stem, ext) = match ext_start {
+        Some(i) => (&bytes[..i], &bytes[i..]),
+        None => (bytes, &b""[..]),
+    };
+    let mut tries = 1;
+    loop {
+        let mut candidate = stem.to_vec();
+        if tries > 1 {
+            candidate.extend_from_slice(format!(" ({tries})").as_bytes());
+        }
+        candidate.extend_from_slice(ext);
+        let target = dir.join(std::ffi::OsString::from_vec(candidate));
         match rename_excl(from, &target) {
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && tries < 100 => tries += 1,
             done => return done.map(|()| target),
@@ -379,27 +557,24 @@ fn parse_zip_totals(out: &str) -> Option<Declared> {
 /// Sum the size column of `tar -tv`. It is the number before the date ("Oct 22"), because owner names can hold spaces.
 /// Return `None` for an unknown line shape. Then an odd listing never looks like a small archive.
 fn parse_tar_listing(out: &str) -> Option<Declared> {
-    const MONTHS: [&str; 12] =
-        ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let mut d = Declared { entries: 0, bytes: 0 };
     for line in out.lines().filter(|l| !l.trim().is_empty()) {
         let words: Vec<&str> = line.split_whitespace().collect();
-        let size = (4..words.len().saturating_sub(1)).find_map(|i| {
-            let day = words[i + 1].parse::<u8>().is_ok_and(|n| (1..=31).contains(&n));
-            (MONTHS.contains(&words[i]) && day).then(|| words[i - 1].parse::<u64>().ok())?
-        })?;
+        let (at, _) = tar_date_span(&words)?;
+        let size: u64 = words[at - 1].parse().ok()?;
         d.entries += 1;
         d.bytes = d.bytes.saturating_add(size);
     }
     Some(d)
 }
 
-fn declared_size(archive: &Path, zip: bool) -> Option<Declared> {
+fn declared_size(archive: &Path, name: &str) -> Option<Declared> {
+    let zip = name.to_lowercase().ends_with(".zip");
     let out = if zip {
-        Command::new("/usr/bin/unzip").arg("-Zt").arg(archive).output()
+        Command::new("unzip").arg("-Zt").arg(archive).output()
     } else {
         // The parser reads C locale month names.
-        Command::new("/usr/bin/tar").env("LC_ALL", "C").arg("-tvf").arg(archive).output()
+        Command::new(tar_tool(name)?).env("LC_ALL", "C").arg("-tvf").arg(archive).output()
     }
     .ok()
     .filter(|o| o.status.success())?;
@@ -451,8 +626,8 @@ fn size_text(bytes: u64) -> String {
 /// Like Finder: one top-level item goes next to the archive. Other content goes in a folder named after the archive.
 pub fn extract_sync(path: &str, job: &Job) -> OpResult {
     let mut res = OpResult::default();
-    let archive = Path::new(path);
-    let name = label(archive);
+    let archive = crate::paths::real(path);
+    let name = label(&(archive));
     let Some(dir) = archive.parent() else {
         res.errors.push(format!("\"{name}\": has no parent folder"));
         return res;
@@ -471,7 +646,7 @@ pub fn extract_sync(path: &str, job: &Job) -> OpResult {
     }
     // Check entry names first. A crafted archive can name a path outside the folder.
     let zip = name.to_lowercase().ends_with(".zip");
-    if lists_escaping_entries(archive, zip) {
+    if lists_escaping_entries(&(archive), &name) {
         remove_any(&tmp);
         res.errors.push(format!("\"{name}\": contains paths outside its own folder, so it wasn't extracted"));
         return res;
@@ -479,7 +654,7 @@ pub fn extract_sync(path: &str, job: &Job) -> OpResult {
     // Refuse an archive that declares more than the disk holds. The listing can lie, so also stop a write far past it.
     // Free space is the cheap signal. Measure the files only when it drops past the limit, so other apps do not trip it.
     // Also measure every 15 s, because macOS can free purgeable space.
-    let Some(declared) = declared_size(archive, zip) else {
+    let Some(declared) = declared_size(&(archive), &name) else {
         remove_any(&tmp);
         res.errors.push(format!("\"{name}\": couldn't read what it holds, so it wasn't extracted"));
         return res;
@@ -515,20 +690,29 @@ pub fn extract_sync(path: &str, job: &Job) -> OpResult {
     };
     let mut cmd;
     if zip {
-        cmd = Command::new("/usr/bin/ditto");
-        cmd.args(["-x", "-k"]).arg(archive).arg(&tmp);
+        #[cfg(target_os = "macos")]
+        {
+            cmd = Command::new("/usr/bin/ditto");
+            cmd.args(["-x", "-k"]).arg(archive).arg(&tmp);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            cmd = Command::new("unzip");
+            cmd.arg("-q").arg(&archive).arg("-d").arg(&tmp);
+        }
     } else {
-        cmd = Command::new("/usr/bin/tar");
-        cmd.arg("-xf").arg(archive).arg("-C").arg(&tmp);
+        // is_extractable already vetted the name, so tar_tool cannot fail here.
+        cmd = Command::new(tar_tool(&name).unwrap());
+        cmd.arg("-xf").arg(&archive).arg("-C").arg(&tmp);
     }
     if let Err(e) = run_watched(cmd, job, watch) {
         remove_any(&tmp);
-        fail(&mut res, archive, e);
+        fail(&mut res, &(archive), e);
         job.item_done();
         return res;
     }
     // Copy the quarantine mark to the output, so Gatekeeper checks apps inside. `ditto` and `tar` do not copy it.
-    if let Some(mark) = quarantine::read(archive) {
+    if let Some(mark) = quarantine::read(&(archive)) {
         if let Ok(rd) = fs::read_dir(&tmp) {
             for e in rd.flatten() {
                 quarantine::apply_tree(&e.path(), &mark);
@@ -549,9 +733,8 @@ pub fn extract_sync(path: &str, job: &Job) -> OpResult {
         .unwrap_or_default();
 
     let placed = if let [only] = items.as_slice() {
-        let n = label(only);
-        let (base, ext) = split_ext(&n, is_plain_dir(only));
-        place_unique(only, dir, base, ext)
+        // The extracted item keeps the raw bytes of its own name.
+        place_unique_os(only, dir, is_plain_dir(only))
     } else {
         place_unique(&tmp, dir, &archive_stem(&name), "")
     };
@@ -601,7 +784,7 @@ mod tests {
         fs::write(base.join("src/a.txt"), "12345").unwrap();
         fs::write(base.join("src/sub dir/b c.txt"), "678").unwrap();
         let run = |cmd: &mut Command| assert!(cmd.current_dir(&base).status().unwrap().success());
-        run(Command::new("/usr/bin/zip").args(["-qr", "t.zip", "src"]));
+        run(Command::new("zip").args(["-qr", "t.zip", "src"]));
         run(Command::new("/usr/bin/tar").args(["-czf", "t.tar.gz", "src"]));
         for name in ["t.zip", "t.tar.gz"] {
             let mut got = list_sync(&base.join(name)).unwrap().entries;
@@ -647,10 +830,10 @@ mod tests {
         fs::write(src.join("dir/a b.txt"), "a").unwrap();
         std::os::unix::fs::symlink("/etc", src.join("link")).unwrap();
         let ok = |cmd: &mut Command| assert!(cmd.current_dir(&src).status().unwrap().success());
-        ok(Command::new("/usr/bin/zip").args(["-qry", "../t.zip", "."]));
+        ok(Command::new("zip").args(["-qry", "../t.zip", "."]));
         ok(Command::new("/usr/bin/tar").args(["-cf", "../t.tar", "."]));
-        assert!(!lists_escaping_entries(&base.join("t.zip"), true));
-        assert!(!lists_escaping_entries(&base.join("t.tar"), false));
+        assert!(!lists_escaping_entries(&base.join("t.zip"), "t.zip"));
+        assert!(!lists_escaping_entries(&base.join("t.tar"), "t.tar"));
         fs::remove_dir_all(&base).unwrap();
     }
 
@@ -765,7 +948,7 @@ mod tests {
         fs::write(base.join("pkg/x.txt"), vec![1u8; 1234]).unwrap();
         let job = jobs::detached();
         compress_sync(&[path_str(&base.join("pkg"))], &job);
-        let d = declared_size(&base.join("pkg.zip"), true).unwrap();
+        let d = declared_size(&base.join("pkg.zip"), "pkg.zip").unwrap();
         assert!(d.bytes >= 1234, "{d:?}");
         fs::remove_dir_all(&base).unwrap();
     }
@@ -855,11 +1038,16 @@ mod tests {
 
     #[test]
     fn seven_zip_extracts_with_the_system_tar() {
+        // Creating a .7z needs bsdtar's --format flag; GNU tar cannot do it.
+        #[cfg(not(target_os = "macos"))]
+        if !have("bsdtar") {
+            return;
+        }
         let base = scratch("7z");
         fs::create_dir_all(base.join("src/inner")).unwrap();
         fs::write(base.join("src/a.txt"), "a").unwrap();
         fs::write(base.join("src/inner/b.txt"), "b").unwrap();
-        let status = Command::new("/usr/bin/tar")
+        let status = Command::new(tar_tool("Bundle.7z").unwrap_or("/usr/bin/tar"))
             .args(["--format", "7zip", "-cf"])
             .arg(base.join("Bundle.7z"))
             .arg("-C")

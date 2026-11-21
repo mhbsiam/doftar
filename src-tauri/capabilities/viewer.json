@@ -23,7 +23,7 @@
     "allow-motion-scale",
     "allow-log-ui-error",
     "allow-list-images",
-    "allow-open-with",
+    "allow-open-path",
     "allow-path-exists",
     "allow-save-image-edit",
     "allow-show-zoomed",
