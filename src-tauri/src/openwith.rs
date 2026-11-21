@@ -81,6 +81,7 @@ pub async fn open_with_apps(path: String) -> Result<Vec<AppInfo>, String> {
 /// Error for a run request without confirmation. The UI asks the user, then retries with `allow_run`.
 pub const NEEDS_RUN_CONFIRMATION: &str = "needs-run-confirmation";
 
+#[cfg(target_os = "macos")]
 pub fn is_app_bundle(app: &str) -> bool {
     let p = crate::paths::real(app);
     p.is_absolute()
@@ -215,6 +216,7 @@ fn launches_from_link(p: &Path) -> bool {
 }
 
 /// Apps that run their input. Terminals are in `TERMINALS`.
+#[cfg(target_os = "macos")]
 const LAUNCHERS: [&str; 2] = ["Python Launcher", "Jar Launcher"];
 
 /// True if the default app runs `path`. A file with no default app runs if it is executable.
@@ -411,6 +413,7 @@ pub async fn editor_apps() -> Result<Vec<AppInfo>, String> {
 #[cfg(not(target_os = "macos"))]
 pub(crate) mod linux {
     use super::{app_name, sort_apps, AppInfo};
+    #[cfg(test)]
     use std::ffi::OsStr;
     use std::os::unix::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
@@ -629,14 +632,10 @@ pub(crate) mod linux {
             return None;
         }
         // A launcher with nothing to run would only produce an error.
-        if entry_value(path, "Exec").is_none() {
-            return None;
-        }
+        entry_value(path, "Exec")?;
         if let Some(t) = entry_value(path, "TryExec") {
             let bin = t.split_whitespace().next().unwrap_or(&t);
-            if which(bin).is_none() {
-                return None;
-            }
+            which(bin)?;
         }
         Some(AppInfo {
             name: desktop_name(path).unwrap_or_else(|| app_name(path)),
@@ -863,7 +862,7 @@ pub(crate) mod linux {
             )
             .unwrap();
 
-            let apps = all_apps_in(&[dir.clone()]);
+            let apps = all_apps_in(std::slice::from_ref(&dir));
             assert_eq!(apps.len(), 1, "{apps:?}");
             assert_eq!(apps[0].name, "Good Tool");
             assert!(apps[0].path.ends_with("good.desktop"));

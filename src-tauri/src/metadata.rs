@@ -19,6 +19,7 @@ pub struct MetaRow {
 }
 
 #[tauri::command(async)]
+#[cfg_attr(not(target_os = "macos"), allow(unused_variables, unused_mut))]
 pub fn item_metadata(path: String) -> Vec<MetaGroup> {
     let mut groups = Vec::new();
     #[cfg(target_os = "macos")]
@@ -51,6 +52,7 @@ pub struct MediaInfo {
     pub camera: Option<String>,
 }
 
+#[cfg(target_os = "macos")]
 const VIDEO_EXTS: [&str; 10] = ["mov", "mp4", "m4v", "mkv", "avi", "webm", "mxf", "mts", "m2ts", "mpg"];
 
 #[tauri::command(async)]
@@ -87,6 +89,7 @@ fn media_info_of(path: &str) -> Option<MediaInfo> {
     (info != MediaInfo::default()).then_some(info)
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn spotlight_media(d: &plist::Dictionary) -> MediaInfo {
     let num = |k: &str| d.get(k).and_then(|v| v.as_real().or_else(|| v.as_signed_integer().map(|i| i as f64)));
     let text = |k: &str| d.get(k).and_then(|v| v.as_string()).filter(|s| !s.trim().is_empty()).map(str::to_owned);
@@ -108,6 +111,7 @@ fn spotlight_media(d: &plist::Dictionary) -> MediaInfo {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn image_groups(d: &plist::Dictionary) -> Vec<MetaGroup> {
     let mut top = Vec::new();
     let mut subs = Vec::new();
@@ -131,12 +135,14 @@ fn image_groups(d: &plist::Dictionary) -> Vec<MetaGroup> {
     out
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn sorted(d: &plist::Dictionary) -> Vec<(&String, &plist::Value)> {
     let mut kv: Vec<_> = d.iter().collect();
     kv.sort_by_key(|(k, _)| label_of(k).to_lowercase());
     kv
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn flatten_dict(prefix: &str, d: &plist::Dictionary, rows: &mut Vec<MetaRow>) {
     for (k, v) in sorted(d) {
         let label = if prefix.is_empty() { label_of(k) } else { format!("{prefix} › {}", label_of(k)) };
@@ -144,6 +150,7 @@ fn flatten_dict(prefix: &str, d: &plist::Dictionary, rows: &mut Vec<MetaRow>) {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn flatten(label: String, v: &plist::Value, rows: &mut Vec<MetaRow>) {
     use plist::Value;
     match v {
@@ -169,6 +176,7 @@ fn flatten(label: String, v: &plist::Value, rows: &mut Vec<MetaRow>) {
     }
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn scalar_text(v: &plist::Value) -> String {
     use plist::Value;
     match v {
@@ -185,6 +193,7 @@ fn scalar_text(v: &plist::Value) -> String {
 }
 
 /// `kMDItemAudioBitRate` becomes "Audio Bit Rate". `{Exif}` becomes "Exif".
+#[cfg(any(target_os = "macos", test))]
 fn label_of(key: &str) -> String {
     let k = key.trim_start_matches('_');
     let k = k.strip_prefix("kMDItem").unwrap_or(k);

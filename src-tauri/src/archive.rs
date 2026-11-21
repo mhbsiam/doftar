@@ -493,7 +493,7 @@ fn place_unique(from: &Path, dir: &Path, base: &str, ext: &str) -> std::io::Resu
 /// Candidates follow `place_unique`/`unique_name`: the name, then "name (2)", "name (3)"…
 fn place_unique_os(from: &Path, dir: &Path, plain_dir: bool) -> std::io::Result<PathBuf> {
     use std::os::unix::ffi::{OsStrExt, OsStringExt};
-    let full = from.file_name().unwrap_or_else(|| from.as_os_str());
+    let full = from.file_name().unwrap_or(from.as_os_str());
     let bytes = full.as_bytes();
     // Where the extension starts, by split_ext's rules on bytes: an extension is text,
     // so a non-text tail belongs to the stem.

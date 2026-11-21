@@ -4,6 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
+#[cfg_attr(not(target_os = "macos"), allow(unused_imports))]
 use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 
 use crate::lock::Locked;
@@ -19,10 +20,12 @@ static PENDING: Mutex<Vec<Opened>> = Mutex::new(Vec::new());
 /// Set once the main window's page has asked for the queue. Before that the window is still loading and stays hidden.
 static READY: AtomicBool = AtomicBool::new(false);
 
+#[cfg(any(target_os = "macos", test))]
 fn queue(paths: Vec<String>, reveal: bool) {
     PENDING.locked().extend(paths.into_iter().map(|path| Opened { path, reveal }));
 }
 
+#[cfg(target_os = "macos")]
 pub fn hand(app: &AppHandle, paths: Vec<String>, reveal: bool) {
     if paths.is_empty() {
         return;

@@ -2,6 +2,7 @@
 //! Doftar keeps the mark on files it unpacks from a marked archive. Gatekeeper then checks them on first run, as after Finder.
 
 use std::ffi::CString;
+#[cfg(target_os = "macos")]
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -88,6 +89,7 @@ fn write_xattr(path: &Path, name: &str, value: &[u8]) -> bool {
 }
 
 #[cfg(not(target_os = "macos"))]
+#[allow(dead_code)] // apply_tree, its only caller, does nothing on Linux
 fn write_xattr(path: &Path, name: &str, value: &[u8]) -> bool {
     let (Some(p), Ok(n)) = (cstr(path), CString::new(name)) else {
         return false;

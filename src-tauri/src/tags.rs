@@ -20,10 +20,12 @@ pub struct Tag {
 
 const LABEL_NAMES: [&str; 8] = ["", "Gray", "Green", "Purple", "Blue", "Yellow", "Red", "Orange"];
 
+#[cfg(any(target_os = "macos", test))]
 pub fn label_of(finder: &[u8]) -> u8 {
     finder.get(9).map_or(0, |b| (b >> 1) & 7)
 }
 
+#[cfg(any(target_os = "macos", test))]
 pub fn parse(bytes: &[u8]) -> Vec<Tag> {
     let Ok(plist::Value::Array(items)) = plist::Value::from_reader(std::io::Cursor::new(bytes))
     else {
@@ -43,6 +45,7 @@ pub fn parse(bytes: &[u8]) -> Vec<Tag> {
         .collect()
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn encode(tags: &[Tag]) -> Vec<u8> {
     let items = tags
         .iter()
@@ -56,6 +59,7 @@ fn encode(tags: &[Tag]) -> Vec<u8> {
 
 /// An item with no label has no tags. This skips the attribute read for most items.
 /// A label without a tags attribute (old tools) reads as the tag of that colour, as in Finder.
+#[cfg(target_os = "macos")]
 pub fn read_labelled(path: &Path, label: u8) -> Vec<Tag> {
     if label == 0 {
         return Vec::new();
@@ -298,7 +302,7 @@ fn encode_names(tags: &[Tag]) -> Vec<u8> {
     tags.iter()
         .map(|t| t.name.as_bytes())
         .collect::<Vec<_>>()
-        .join(&[b';'][..])
+        .join(&b";"[..])
 }
 
 /// Replace the tags. Set the Finder label to the newest coloured tag. Otherwise Finder shows a removed colour.

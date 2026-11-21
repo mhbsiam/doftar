@@ -107,6 +107,7 @@ mod mac {
         b.1 = paths.to_vec();
         b.0
     }
+    #[allow(dead_code)] // the crate-level write_text that calls it is macOS-only
     pub fn write_text(_: &str) -> bool {
         false
     }
@@ -131,6 +132,7 @@ mod mac {
 #[cfg(target_os = "macos")]
 pub use mac::paths as pasteboard_paths;
 
+#[cfg(target_os = "macos")]
 pub fn write_text(text: &str) -> bool {
     mac::write_text(text)
 }

@@ -80,6 +80,7 @@ pub const PACKAGE_EXTS: &[&str] = &[
     "xpc", "saver", "mdimporter", "xcarchive",
 ];
 
+#[cfg_attr(not(target_os = "macos"), allow(unreachable_code))]
 pub(crate) fn is_package_dir(path: &Path, ext: &str) -> bool {
     // Package bundles are a macOS concept; on Linux a ".app" folder is a folder.
     #[cfg(not(target_os = "macos"))]
@@ -216,6 +217,7 @@ pub(crate) fn plausible_ext(ext: &str) -> bool {
 
 /// Splits `name` into stem and extension with its dot. "a.tar.gz" is ("a", ".tar.gz").
 /// A plain folder, a dot file and an implausible extension keep the whole name as the stem.
+#[cfg(target_os = "macos")]
 pub(crate) fn split_ext(name: &str, plain_dir: bool) -> (&str, &str) {
     let Some(i) = name.rfind('.').filter(|&i| i > 0 && !plain_dir) else {
         return (name, "");

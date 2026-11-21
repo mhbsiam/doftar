@@ -336,6 +336,7 @@ pub(super) fn push_volume(v: &mut Vec<VolumeInfo>, path: &str, name: &str, eject
     });
 }
 
+#[cfg(target_os = "macos")]
 pub(super) const SYSTEM_VOLUME_NAMES: [&str; 4] = ["Recovery", "Preboot", "VM", "Update"];
 
 /// Bytes free on the volume that holds `path`.

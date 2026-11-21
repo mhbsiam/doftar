@@ -231,6 +231,7 @@ fn app_icon(_app: &Path) -> Option<PathBuf> {
     None
 }
 
+#[cfg(target_os = "macos")]
 pub(crate) fn wait_or_kill(child: &mut std::process::Child, limit: Duration) -> bool {
     wait_within(child, limit).unwrap_or(false)
 }

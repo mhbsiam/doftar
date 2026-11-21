@@ -1041,7 +1041,7 @@ mod ino {
                 wanted.len()
             );
         }
-        let mut stale_live: Vec<String> = {
+        let stale_live: Vec<String> = {
             let mut files = state.files.locked();
             if gen < FILES_APPLIED.load(Ordering::Relaxed) {
                 // A newer call owns the set. Take back what it does not hold — after

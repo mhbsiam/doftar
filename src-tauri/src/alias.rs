@@ -3,14 +3,19 @@
 use serde::Serialize;
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
 use crate::fsops::label;
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 use crate::fsops::path_str;
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 use crate::jobs::{OpResult, Step};
 
+#[cfg(target_os = "macos")]
 const IS_ALIAS: u16 = 0x8000;
 
+#[cfg(target_os = "macos")]
 pub fn finder_info_is_alias(info: &[u8; 32]) -> bool {
     u16::from_be_bytes([info[8], info[9]]) & IS_ALIAS != 0
 }
@@ -42,6 +47,7 @@ pub fn is_alias_file(_p: &Path) -> bool {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 fn alias_path(original: &Path) -> Option<std::path::PathBuf> {
     let dir = original.parent()?;
     let name = label(original);
@@ -72,11 +78,13 @@ fn make_one(original: &Path) -> Result<String, String> {
 }
 
 #[cfg(all(test, not(target_os = "macos")))]
+#[allow(dead_code)] // make_aliases, its only caller, is macOS-only
 fn make_one(_original: &Path) -> Result<String, String> {
     Err("aliases need macOS".into())
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 pub fn make_aliases(paths: Vec<String>) -> OpResult {
     let mut res = OpResult::default();
     for p in &paths {

@@ -109,7 +109,7 @@ pub fn info(dir: &Path) -> Option<GitInfo> {
             // The folder is untracked, so all its unignored contents are untracked.
             for child in std::fs::read_dir(&dir).ok()?.flatten() {
                 let Some(name) = child.file_name().to_str().map(str::to_string) else { continue };
-                if !repo.status_should_ignore(&(crate::paths::real(&format!("{prefix}{name}")))).unwrap_or(false) {
+                if !repo.status_should_ignore(&(crate::paths::real(format!("{prefix}{name}")))).unwrap_or(false) {
                     files.insert(name, "untracked");
                 }
             }

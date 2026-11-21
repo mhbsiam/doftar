@@ -3,6 +3,7 @@
 use super::*;
 
 #[tauri::command(async)]
+#[cfg_attr(not(target_os = "macos"), allow(unreachable_code))]
 pub fn open_terminal(path: String, app: Option<String>) -> Result<(), String> {
     let p = crate::paths::real(&path);
     let dir = if p.is_dir() {
@@ -59,6 +60,7 @@ pub struct RunOutcome {
 /// LaunchServices drops the arguments. A child terminal inherits the sandbox,
 /// and a shell cannot live in it.
 #[tauri::command(async)]
+#[cfg_attr(not(target_os = "macos"), allow(unreachable_code))]
 pub fn run_in_terminal(dir: String, command: String, app: Option<String>) -> Result<RunOutcome, String> {
     let dir_path = crate::paths::real(&dir);
     if !dir_path.is_absolute() || !dir_path.is_dir() {
@@ -71,7 +73,7 @@ pub fn run_in_terminal(dir: String, command: String, app: Option<String>) -> Res
     let app = app.unwrap_or_else(|| "Terminal".to_string());
     #[cfg(not(target_os = "macos"))]
     {
-        return match linux::run(&(dir_path), &command, &app) {
+        return match linux::run(&(dir_path), command, &app) {
             Ok(()) => Ok(RunOutcome { ran: true, reason: None }),
             Err(reason) => linux::open_terminal(&(dir_path), &app)
                 .map(|()| RunOutcome { ran: false, reason: Some(reason) }),

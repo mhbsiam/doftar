@@ -13,6 +13,7 @@ const MAX_LOG_BYTES: u64 = 1024 * 1024;
 const MAX_UI_ERROR_BYTES: usize = 16 * 1024;
 /// By entry, not by line: a backtrace alone can run past any line count and push out its own message.
 const DIAGNOSTIC_ENTRIES: usize = 3;
+#[cfg(any(target_os = "macos", test))]
 const CRASH_REPORTS_SHOWN: usize = 5;
 const ENTRY_MARK: &str = "=== ";
 

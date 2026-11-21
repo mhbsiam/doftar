@@ -7,12 +7,16 @@ use std::time::Duration;
 
 use tauri::{PhysicalPosition, PhysicalSize, WebviewWindow, Window};
 
+#[cfg(target_os = "macos")]
 const OPEN: Duration = Duration::from_millis(240);
+#[cfg(target_os = "macos")]
 const CLOSE: Duration = Duration::from_millis(190);
 const GLIDE: Duration = Duration::from_millis(260);
 /// Scale of the window at the start of a zoom in and the end of a zoom out.
+#[cfg(target_os = "macos")]
 const FROM: f64 = 0.86;
 /// Fraction of the way to the source item at which a zoom in starts.
+#[cfg(target_os = "macos")]
 const AIM_PULL: f64 = 0.35;
 
 /// A rect in CSS pixels from the top-left of the window.

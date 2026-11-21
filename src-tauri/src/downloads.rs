@@ -2,6 +2,7 @@
 //! Only a subscriber on the file's own folder sees it, so each watched cloud folder is subscribed.
 //! While a download runs, the interface gets `cloud:downloads`. When it ends, the interface gets `fs:changed`.
 
+#[cfg(any(target_os = "macos", test))]
 pub fn is_cloud(path: &str) -> bool {
     path.contains("/Library/CloudStorage/") || path.contains("/Library/Mobile Documents/")
 }

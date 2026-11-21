@@ -355,6 +355,7 @@ impl Job {
     }
 
     #[cfg(test)]
+    #[cfg(target_os = "macos")]
     pub fn bytes_done(&self) -> u64 {
         self.bytes_done.load(Ordering::Relaxed)
     }

@@ -14,19 +14,27 @@ use tauri::{Emitter, Manager, WebviewWindow, Window};
 
 use crate::zoom::CssRect;
 
+#[cfg(target_os = "macos")]
 const FLY_IN: Duration = Duration::from_millis(360);
+#[cfg(target_os = "macos")]
 const FLY_BACK: Duration = Duration::from_millis(320);
+#[cfg(target_os = "macos")]
 const FADE_OUT: Duration = Duration::from_millis(140);
+#[cfg(target_os = "macos")]
 const SETTLE: Duration = Duration::from_millis(140);
+#[cfg(target_os = "macos")]
 const FADE: Duration = Duration::from_millis(180);
 /// Wait this long for the page to draw the image. Then show the viewer.
+#[cfg(target_os = "macos")]
 const LAND_WAIT: Duration = Duration::from_millis(1200);
 /// Keep the thumbnail over its tile until the tile paints again.
+#[cfg(target_os = "macos")]
 const LINGER: Duration = Duration::from_millis(50);
 const ASK_WAIT: Duration = Duration::from_millis(80);
 /// Keep in step with `THUMB_PX` in src/components/FileIcon.tsx.
 const THUMB_PX: u32 = 160;
 /// The toolbar height in CSS pixels. Keep in step with `.iv-bar` in global.css.
+#[cfg(target_os = "macos")]
 const BAR_H: f64 = 40.0;
 
 #[derive(Clone)]
@@ -40,6 +48,7 @@ struct Shown {
 }
 
 /// Only an icon has no shadow.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone)]
 pub enum Picture {
     File(PathBuf),
@@ -47,6 +56,7 @@ pub enum Picture {
     Icon(Vec<u8>),
 }
 
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[derive(Clone, Copy)]
 pub enum Landing {
     Image(Option<(f64, f64)>),
@@ -55,6 +65,7 @@ pub enum Landing {
     Badge,
 }
 
+#[cfg(target_os = "macos")]
 const BADGE: f64 = 0.4;
 
 static SHOWN: Mutex<Option<HashMap<String, Shown>>> = Mutex::new(None);
@@ -114,6 +125,7 @@ pub fn shown_path(label: &str) -> Option<String> {
     shown(label)?.path
 }
 
+#[cfg(target_os = "macos")]
 fn badge(stage: CssRect) -> CssRect {
     let side = (stage.w.min(stage.h) * BADGE).max(1.0);
     CssRect {
@@ -125,6 +137,7 @@ fn badge(stage: CssRect) -> CssRect {
 }
 
 /// Place the image as the viewer page does.
+#[cfg(any(target_os = "macos", test))]
 fn fit(w: f64, h: f64, stage: CssRect, enlarge: bool) -> CssRect {
     let mut s = (stage.w / w).min(stage.h / h);
     if !enlarge {
@@ -140,6 +153,7 @@ fn fit(w: f64, h: f64, stage: CssRect, enlarge: bool) -> CssRect {
 }
 
 /// Use the stage the page last measured. If there is none, guess.
+#[cfg(target_os = "macos")]
 fn stage_for(label: &str, width: f64, height: f64) -> CssRect {
     shown(label).map(|s| s.stage).unwrap_or(CssRect {
         x: 0.0,
@@ -166,6 +180,7 @@ pub fn viewer_return_rect(id: u64, rect: Option<CssRect>) {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn later(w: &WebviewWindow, d: Duration, f: impl FnOnce() + Send + 'static) {
     let w = w.clone();
     std::thread::spawn(move || {

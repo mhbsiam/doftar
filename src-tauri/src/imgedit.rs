@@ -407,7 +407,7 @@ mod imageio {
                 std::fs::File::open(path).map_err(|e| e.to_string())?,
             ))
             .map_err(|_| "Doftar can't read this image".to_string())?;
-            dec.set_limits(image::io::Limits::default())
+            dec.set_limits(image::Limits::default())
                 .map_err(|_| "Doftar can't read this image".to_string())?;
             let (w, h) = dec.dimensions();
             if u64::from(w) * u64::from(h) * 4 > 512 * 1024 * 1024 {
