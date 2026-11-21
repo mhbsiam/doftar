@@ -469,7 +469,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Privacy and safety",
         points: [
-          "Doftar makes no network connections: no update check, telemetry or crash reports. Check for updates opens the releases page in your browser.",
+          "Doftar makes no network connections: no update check, telemetry or crash reports. Check for updates (in the Options menu) opens the latest release in your browser.",
           "Errors are kept in a log on your Mac. They leave it only if you use Help → Copy Diagnostic Info and paste them somewhere yourself.",
           "Opening a script, installer or program always asks first.",
           "Documents, Markdown and notebooks can't run code.",

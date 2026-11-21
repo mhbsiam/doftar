@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the main and tab windows. Files are opened through Doftar's own open_path / open_with commands, which refuse to run programs without confirmation; a previewed document's web and mail links go to the browser through open_web_link; the opener plugin may only open the one settings link and Doftar's GitHub and releases pages.",
+  "description": "Capabilities for the main and tab windows. Files are opened through Doftar's own open_path / open_with commands, which refuse to run programs without confirmation; a previewed document's web and mail links go to the browser through open_web_link; the opener plugin may only open the one settings link and Doftar's GitHub page and its latest release.",
   "windows": ["main", "tab-*"],
   "permissions": [
     "core:default",
@@ -23,7 +23,7 @@
       "allow": [
         { "url": "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles" },
         { "url": "https://github.com/mhbsiam/doftar" },
-        { "url": "https://github.com/mhbsiam/doftar/releases" }
+        { "url": "https://github.com/mhbsiam/doftar/releases/latest" }
       ]
     },
     "drag:default",

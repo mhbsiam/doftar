@@ -1880,7 +1880,7 @@ export function setTheme(theme: ThemePref, from?: Element | null) {
   setAppearance({ theme }, from);
 }
 
-/** capabilities/default.json allows opening this URL and its releases. */
+/** capabilities/default.json allows opening this URL and its latest release. */
 const REPO_URL = "https://github.com/mhbsiam/doftar";
 
 function openGitHub(url: string) {
@@ -1892,7 +1892,7 @@ function builtLabel(now = Date.now()): string {
   if (typeof __BUILD_MS__ === "undefined") return "";
   const built = new Date(__BUILD_MS__).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const old = now - __BUILD_MS__ > 183 * 24 * 3600 * 1000;
-  return `, built ${built}${old ? ". It is over six months old: Help → Check for Updates shows newer versions" : ""}`;
+  return `, built ${built}${old ? ". It is over six months old: Options → Check for updates shows the latest version" : ""}`;
 }
 
 export async function showAbout() {
@@ -1913,7 +1913,7 @@ export function openRepo() {
 }
 
 export function checkForUpdates() {
-  openGitHub(`${REPO_URL}/releases`);
+  openGitHub(`${REPO_URL}/releases/latest`);
 }
 
 /** Data files that open as one table, compared row by row. Keep in step with `Data` in src-tauri/src/data.rs. */
