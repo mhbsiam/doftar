@@ -314,7 +314,8 @@ pub(crate) fn is_dataless(meta: &fs::Metadata) -> bool {
 struct Located {
     src: PathBuf,
     out: PathBuf,
-    /// Lowercase extension of the source, without the dot. Picks the Quick Look renderer.
+    /// Lowercase extension of the source, without the dot. Only the Linux thumbnailer reads it.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     ext: String,
     dim: u32,
     quick_look: bool,

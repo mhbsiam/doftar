@@ -29,6 +29,7 @@ mod opened;
 mod paths;
 mod openwith;
 mod pdf;
+#[cfg(not(target_os = "macos"))]
 mod proc;
 mod store;
 mod tags;

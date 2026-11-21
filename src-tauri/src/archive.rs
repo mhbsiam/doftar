@@ -230,6 +230,7 @@ const TAR_SUFFIXES: [&str; 15] = [
 ];
 
 /// What GNU tar reads. The rest of TAR_SUFFIXES needs libarchive.
+#[cfg(not(target_os = "macos"))]
 const TAR_CORE: [&str; 7] = [".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz", ".tar"];
 
 /// True once per run when `prog` is on PATH.

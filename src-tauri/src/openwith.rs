@@ -882,7 +882,9 @@ pub async fn all_apps() -> Result<Vec<AppInfo>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(target_os = "macos"))]
     use std::ffi::OsStr;
+    #[cfg(not(target_os = "macos"))]
     use std::os::unix::ffi::OsStrExt;
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
