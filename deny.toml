@@ -2,8 +2,8 @@
 # Run: `cargo deny --manifest-path src-tauri/Cargo.toml check`.
 
 [graph]
-# Doftar ships for Apple silicon Macs only. Dependencies of other platforms (for example the tauri iOS/Android HTTP client) are not in the binary.
-targets = ["aarch64-apple-darwin"]
+# Doftar ships for Apple silicon Macs and, on this branch, x86_64 Linux. Dependencies of other platforms (for example the tauri iOS/Android HTTP client) are not in either binary.
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
 
 [advisories]
 version = 2
@@ -29,11 +29,16 @@ allow = [
 confidence-threshold = 0.8
 # Doftar is never published to crates.io. Only its dependencies are checked.
 private = { ignore = true }
+# Linux only, at build time: the GTK -sys crates use system-deps, which uses target-lexicon.
+# Apache-2.0 with the LLVM exception is at least as permissive as Apache-2.0.
+exceptions = [
+  { crate = "target-lexicon", allow = ["Apache-2.0 WITH LLVM-exception"] },
+]
 
 [bans]
 multiple-versions = "allow"
 wildcards = "allow"
-# Doftar makes no network connections. Any of these in the macOS dependency graph is a bug.
+# Doftar makes no network connections. Any of these in the macOS or Linux dependency graph is a bug.
 deny = [
   { crate = "reqwest", reason = "Doftar is offline: no HTTP client" },
   { crate = "hyper", reason = "Doftar is offline: no HTTP stack" },
@@ -53,7 +58,7 @@ deny = [
   { crate = "tauri-plugin-updater", reason = "Doftar is offline: updates are manual downloads" },
   { crate = "tauri-plugin-websocket", reason = "Doftar is offline" },
   { crate = "tauri-plugin-shell", reason = "the webview must not run shell commands" },
-  { crate = "sentry", reason = "no crash reporting leaves the Mac" },
+  { crate = "sentry", reason = "no crash reporting leaves the computer" },
   { crate = "rustls", reason = "nothing to encrypt in transit: Doftar is offline" },
   { crate = "native-tls", reason = "nothing to encrypt in transit: Doftar is offline" },
   { crate = "openssl", reason = "nothing to encrypt in transit: Doftar is offline" },
