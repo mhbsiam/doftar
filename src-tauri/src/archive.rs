@@ -693,7 +693,7 @@ pub fn extract_sync(path: &str, job: &Job) -> OpResult {
         #[cfg(target_os = "macos")]
         {
             cmd = Command::new("/usr/bin/ditto");
-            cmd.args(["-x", "-k"]).arg(archive).arg(&tmp);
+            cmd.args(["-x", "-k"]).arg(&archive).arg(&tmp);
         }
         #[cfg(not(target_os = "macos"))]
         {

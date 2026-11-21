@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn volumes_mounted_outside_volumes_count_as_mounted() {
         // /dev is a separate file system, mounted outside /Volumes.
-        assert!(mount_points().iter().any(|p| p == crate::paths::real("/dev")));
+        assert!(mount_points().iter().any(|p| *p == crate::paths::real("/dev")));
         assert!(mounted_devices().contains(&fs::metadata("/dev").unwrap().dev()));
     }
 

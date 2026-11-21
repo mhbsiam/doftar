@@ -963,7 +963,7 @@ mod tests {
         fs::write(&src, PNG).unwrap();
         assert_eq!(pixel_max(&src), Some(8));
         let out = make_thumbnail(&dir.join("cache"), src.to_str().unwrap(), 160).unwrap();
-        assert_eq!(pixel_max(crate::paths::real(&out)), Some(8));
+        assert_eq!(pixel_max(&crate::paths::real(&out)), Some(8));
         let _ = fs::remove_dir_all(&dir);
     }
 

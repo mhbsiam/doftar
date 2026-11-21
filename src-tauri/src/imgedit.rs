@@ -714,7 +714,7 @@ mod tests {
         assert_eq!(crate::paths::real(&first).file_name().unwrap(), "a (edited).png");
         assert_eq!(crate::paths::real(&second).file_name().unwrap(), "a (edited) (2).png");
         assert_eq!(fs::read(&p).unwrap(), before);
-        assert_eq!(look(crate::paths::real(&first)).3, [White, Blue, Green, Red]);
+        assert_eq!(look(&crate::paths::real(&first)).3, [White, Blue, Green, Red]);
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -751,7 +751,7 @@ mod tests {
         let svg = dir.join("a.svg");
         fs::write(&svg, "<svg/>").unwrap();
         assert!(save(&svg, &edit(1, false, None), false, None).is_err());
-        assert!(save(crate::paths::real("relative.png"), &edit(1, false, None), false, None).is_err());
+        assert!(save(&crate::paths::real("relative.png"), &edit(1, false, None), false, None).is_err());
         let names: Vec<_> = fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
         assert_eq!(names.len(), 2);
         fs::remove_dir_all(&dir).unwrap();

@@ -7,7 +7,7 @@ pub(super) fn trash_one(path: &str) -> Result<Option<String>, String> {
     use objc2::rc::Retained;
     use objc2_foundation::{NSFileManager, NSString, NSURL};
 
-    guard::check(crate::paths::real(path))?;
+    guard::check(&crate::paths::real(path))?;
     let url = NSURL::fileURLWithPath(&NSString::from_str(path));
     let mut resulting: Option<Retained<NSURL>> = None;
     NSFileManager::defaultManager()
@@ -152,14 +152,12 @@ pub async fn delete_permanently(
 /// A `.git` holds history that nothing else has. It may only go to the Trash.
 /// A `.git` already in a Trash may be deleted.
 pub(super) fn keeps_history(path: &Path) -> Result<(), String> {
-    let mut in_trash = path.components().any(|c| {
+    let in_trash = path.components().any(|c| {
         let s = c.as_os_str().to_str();
         matches!(s, Some(".Trash" | ".Trashes")) || s.is_some_and(|s| s.starts_with(".Trash-"))
     });
     #[cfg(not(target_os = "macos"))]
-    {
-        in_trash = in_trash || crate::trash::user_trash().ok().is_some_and(|t| path.starts_with(t));
-    }
+    let in_trash = in_trash || crate::trash::user_trash().ok().is_some_and(|t| path.starts_with(t));
     if !in_trash && label(path).eq_ignore_ascii_case(".git") {
         return Err("a repository's .git can't be deleted permanently; move it to the Trash instead".into());
     }

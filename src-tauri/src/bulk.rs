@@ -271,14 +271,14 @@ mod tests {
         for dir in ["/Applications", "/usr/bin", "/System/Library"] {
             let p = crate::paths::real(dir);
             if p.is_dir() {
-                same(&slow(p, true), &fast(p, true));
+                same(&slow(&p, true), &fast(&p, true));
             }
         }
     }
 
     #[test]
     fn unreadable_or_missing_paths_defer_to_the_ordinary_listing() {
-        assert!(list_dir(crate::paths::real("/definitely/not/here"), true).is_none());
+        assert!(list_dir(&crate::paths::real("/definitely/not/here"), true).is_none());
         let base = scratch("bulk-file");
         fs::write(base.join("f"), "x").unwrap();
         assert!(list_dir(&base.join("f"), true).is_none(), "a file is not a directory");

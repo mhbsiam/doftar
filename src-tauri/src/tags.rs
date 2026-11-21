@@ -241,6 +241,12 @@ pub fn read(path: &Path) -> Vec<Tag> {
     }
 }
 
+/// macOS reads tags as `main` always has: a failed read counts as untagged.
+#[cfg(target_os = "macos")]
+fn read_strict(path: &Path) -> std::io::Result<Vec<Tag>> {
+    Ok(read(path))
+}
+
 /// Like `read`, but a failing attribute read is an error: `edit_tags` must not mistake
 /// it for "untagged" and overwrite the tags that are really there.
 #[cfg(not(target_os = "macos"))]

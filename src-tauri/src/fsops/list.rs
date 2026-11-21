@@ -113,7 +113,7 @@ pub(crate) fn list_dir_sync(path: &str, show_hidden: bool) -> Result<Vec<FileEnt
     let dir = crate::paths::real(path);
     // `None` means use the per-entry path. That path also gives the error for unreadable folders.
     #[cfg(target_os = "macos")]
-    let bulk = crate::bulk::list_dir(dir, show_hidden);
+    let bulk = crate::bulk::list_dir(&dir, show_hidden);
     #[cfg(not(target_os = "macos"))]
     let bulk: Option<Vec<FileEntry>> = None;
     let mut entries = match bulk {

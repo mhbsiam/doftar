@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn applet_only_runs_scripts_from_its_folder() {
-        let s = source(crate::paths::real("/tmp/x"));
+        let s = source(&crate::paths::real("/tmp/x"));
         assert!(s.contains("if p starts with \"/tmp/x/\" then"));
         assert!(s.contains("do shell script \"/bin/sh \" & quoted form of p"));
     }

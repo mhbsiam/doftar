@@ -115,14 +115,14 @@ pub fn resolve_alias(path: String) -> Result<AliasTarget, String> {
             &url,
             NSURLBookmarkResolutionOptions::WithoutUI,
         )
-        .map_err(|_| format!("The original of \"{}\" can't be found", label(crate::paths::real(&path))))?;
+        .map_err(|_| format!("The original of \"{}\" can't be found", label(&crate::paths::real(&path))))?;
         let p = target.path().map(|s| s.to_string()).ok_or("the alias has no target")?;
         let target = crate::paths::real(&p);
         let ext = target
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        let is_dir = target.is_dir() && !crate::fsops::is_package_dir(target, &ext);
+        let is_dir = target.is_dir() && !crate::fsops::is_package_dir(&target, &ext);
         Ok(AliasTarget { path: p, is_dir })
     }
     #[cfg(not(target_os = "macos"))]
@@ -166,7 +166,7 @@ mod tests {
             ]
         );
         for p in &made {
-            assert!(is_alias_file(crate::paths::real(p)), "{p} should be flagged as an alias");
+            assert!(is_alias_file(&crate::paths::real(p)), "{p} should be flagged as an alias");
         }
         assert!(!is_alias_file(&base.join("note.txt")));
 

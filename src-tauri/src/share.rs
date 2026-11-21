@@ -1,7 +1,5 @@
 //! The macOS share menu for files.
 
-use std::path::Path;
-
 /// Where to point the picker: a rect in CSS pixels from the webview top-left corner.
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 pub struct Anchor {
