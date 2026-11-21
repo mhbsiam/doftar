@@ -16,16 +16,17 @@ export function useSystemInfo(): SystemInfo | null {
         })
         .catch(() => {});
     load();
-    void api.watchPath("/Volumes").catch(() => {});
+    const roots = ["/media", "/run/media", "/mnt"];
+    for (const r of roots) void api.watchPath(r).catch(() => {});
     const unlisten = listen<string>("fs:changed", (ev) => {
-      if (ev.payload === "/Volumes" || ev.payload.startsWith("/Volumes/")) {
+      if (roots.some((r) => ev.payload === r || ev.payload.startsWith(`${r}/`))) {
         load();
       }
     });
     return () => {
       cancelled = true;
       void unlisten.then((f) => f());
-      void api.unwatchPath("/Volumes").catch(() => {});
+      for (const r of roots) void api.unwatchPath(r).catch(() => {});
     };
   }, []);
 

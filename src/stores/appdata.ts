@@ -47,6 +47,8 @@ interface AppDataStore {
   /** `readOnly`: the saved store could not be read, so it is left as it is. */
   phase: "loading" | "ready" | "readOnly";
   home: string;
+  /** The real Trash folder from the backend, honoring `$XDG_DATA_HOME`. */
+  trashDir: string | null;
   pins: string[];
   cloudDrives: CloudDrive[];
   favorites: FavItem[];
@@ -303,6 +305,7 @@ const NO_TRASH_ORIGINS: AppDataStore["trashOrigins"] = {};
 export const useAppData = create<AppDataStore>((set, get) => ({
   phase: "loading",
   home: "/",
+  trashDir: null,
   pins: [],
   cloudDrives: [],
   favorites: NO_FAVORITES,
@@ -347,6 +350,7 @@ export const useAppData = create<AppDataStore>((set, get) => ({
     set({
       phase,
       home,
+      trashDir: info?.trashDir ?? null,
       pins,
       cloudDrives,
       favorites: now.favorites !== NO_FAVORITES ? now.favorites : favorites,

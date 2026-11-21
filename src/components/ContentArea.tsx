@@ -23,6 +23,7 @@ import { notifySettled } from "../util/transition";
 
 const NO_NAMES: string[] = [];
 
+
 /** The tab's page, inside a boundary that clears when the tab or its place changes. */
 export function ContentArea() {
   const tab = useActiveTab();
@@ -85,13 +86,15 @@ function ContentBody() {
           !isFolder(e) &&
           fileKind(e.ext) === "image" &&
           e.name.toLowerCase().startsWith("screenshot") &&
-          !e.path.startsWith(`${home}/Library/`)
+          // XDG app data (the Linux ~/Library) holds cached screenshots, not the user's.
+          ![".config", ".cache", ".local"].some((d) => e.path.startsWith(`${home}/${d}/`))
       ),
     [shotsFound.entries, home]
   );
   const results = shotsPage ? shotsFound : tagFound;
 
-  // Listings read tags only for items with a colour label. Read the rest here.
+  // Each listing already reads the tags of its items. A scan re-reads them as a group,
+  // so tags changed elsewhere settle in the store too.
   const listingSettled = here !== null && loadedPath === here && !loading;
   useTagScan(entries, listingSettled, tagFilter !== null || groupBy === "tags", refreshTick);
 

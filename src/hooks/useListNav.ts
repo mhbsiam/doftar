@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { usePane, usePanes, useTabs } from "../stores/tabs";
 import { layoutOf, scrollToIndex } from "./useVirtual";
 import { moveByRows } from "../util/layout";
-import { quickLookSelection } from "../actions";
+import { previewSelection } from "../actions";
 import { textScale } from "../util/textScale";
 import type { FileEntry } from "../types";
 
@@ -120,7 +120,7 @@ export function useListNav(opts: Opts) {
         return;
       case " ":
         e.preventDefault();
-        if (!e.repeat) quickLookSelection();
+        if (!e.repeat) previewSelection();
         return;
     }
 

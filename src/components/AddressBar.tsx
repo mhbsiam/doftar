@@ -82,10 +82,15 @@ function crumbsFor(path: string, bootVolumeName: string): Crumb[] {
   const parts = path.split("/").filter(Boolean);
   let crumbs: Crumb[];
   let acc: string;
-  if (parts[0] === "Volumes" && parts.length >= 2) {
-    acc = `/Volumes/${parts[1]}`;
-    crumbs = [{ label: parts[1], path: acc, root: true }];
-    parts.splice(0, 2);
+  const volIndex =
+    parts[0] === "mnt" ? 2
+    : parts[0] === "media" ? 3
+    : parts[0] === "run" && parts[1] === "media" ? 4
+    : 0;
+  if (volIndex && parts.length >= volIndex) {
+    acc = "/" + parts.slice(0, volIndex).join("/");
+    crumbs = [{ label: parts[volIndex - 1], path: acc, root: true }];
+    parts.splice(0, volIndex);
   } else {
     acc = "";
     crumbs = [{ label: bootVolumeName, path: "/", root: true }];
@@ -372,7 +377,7 @@ function SettingsMenu() {
         <MenuList>
           <MenuItem
             icon={<SettingsRegular />}
-            secondaryContent="⌘,"
+            secondaryContent="Ctrl+,"
             onClick={() => useUI.getState().setSettingsOpen(true)}
           >
             Settings…
@@ -388,14 +393,14 @@ function SettingsMenu() {
           <MenuDivider />
           <MenuItem
             icon={<BookQuestionMarkRegular />}
-            secondaryContent="⌘?"
+            secondaryContent="Ctrl+?"
             onClick={() => useUI.getState().setHelpOpen(true)}
           >
             Help
           </MenuItem>
           <MenuItem
             icon={<KeyboardRegular />}
-            secondaryContent="⌘/"
+            secondaryContent="Ctrl+/"
             onClick={() => useUI.getState().setShortcutsOpen(true)}
           >
             Keyboard shortcuts
@@ -599,7 +604,7 @@ export function AddressBar() {
       <button
         className="navbtn"
         disabled={!undoTop || historyBusy}
-        title={undoTop ? `Undo ${undoTop.label} (⌘Z)` : "Undo (⌘Z)"}
+        title={undoTop ? `Undo ${undoTop.label} (Ctrl+Z)` : "Undo (Ctrl+Z)"}
         aria-label="Undo"
         onClick={() => void undoLast()}
       >
@@ -608,7 +613,7 @@ export function AddressBar() {
       <button
         className="navbtn"
         disabled={!redoTop || historyBusy}
-        title={redoTop ? `Redo ${redoTop.label} (⇧⌘Z)` : "Redo (⇧⌘Z)"}
+        title={redoTop ? `Redo ${redoTop.label} (Ctrl+Shift+Z)` : "Redo (Ctrl+Shift+Z)"}
         aria-label="Redo"
         onClick={() => void redoLast()}
       >
@@ -761,25 +766,6 @@ export function AddressBar() {
             onClick={() => useTabs.getState().setDeepSearch(deepOn ? null : searchFolder)}
           >
             Subfolders
-          </button>
-        )}
-        {canDeepSearch && search.trim() && (
-          <button
-            className="search-deep"
-            role="checkbox"
-            aria-checked={deepOn && searchContents}
-            title={
-              deepOn && searchContents
-                ? "Matching names and text inside files (click to match names only)"
-                : "Also match text inside files. Covers what Spotlight has indexed, in this folder and its subfolders"
-            }
-            onClick={() => {
-              const on = !(deepOn && searchContents);
-              useSettings.getState().set({ searchContents: on });
-              if (on && !deepOn) useTabs.getState().setDeepSearch(searchFolder);
-            }}
-          >
-            Contents
           </button>
         )}
         {deepOn && search.trim() && (

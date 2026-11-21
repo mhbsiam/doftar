@@ -274,7 +274,7 @@ function FileSummary({ entry }: { entry: FileEntry }) {
   useEffect(() => {
     setPicture(null);
     // A cloud file with no local data would be downloaded to draw it.
-    if (entry.isDataless || (!externalThumbs && entry.path.startsWith("/Volumes/"))) return;
+    if (entry.isDataless || (!externalThumbs && /^\/(media\/[^/]+|run\/media\/[^/]+\/[^/]+|mnt)\/[^/]+/.test(entry.path))) return;
     let live = true;
     let replied = false;
     const id = newThumbId();

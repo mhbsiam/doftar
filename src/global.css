@@ -11,6 +11,21 @@ body {
   }
 }
 
+/* Dropdowns and their popup lists, scrollbars and other native widgets are
+   painted by WebKitGTK from the page's color scheme, not from these variables.
+   Without a scheme from the app theme, a dark system theme paints them dark
+   inside the light app. Before the app sets data-theme, follow the system,
+   like the meta in index.html. */
+:root {
+  color-scheme: light dark;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 :root {
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
     Arial, sans-serif;
@@ -96,7 +111,7 @@ body {
     0 8px 24px rgba(0, 0, 0, 0.1);
   --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.19), 0 2px 21px rgba(0, 0, 0, 0.15);
   --scrim: rgba(0, 0, 0, 0.3);
-  --menu-bg: rgba(252, 252, 252, 0.85);
+  --menu-bg: #fcfcfc;
   --menu-solid: #f9f9f9;
 }
 
@@ -147,7 +162,7 @@ body {
     0 8px 24px rgba(0, 0, 0, 0.3);
   --shadow-dialog: 0 32px 64px rgba(0, 0, 0, 0.37), 0 2px 21px rgba(0, 0, 0, 0.37);
   --scrim: rgba(0, 0, 0, 0.5);
-  --menu-bg: rgba(52, 56, 68, 0.92);
+  --menu-bg: #343844;
   --menu-solid: #343844;
 }
 
@@ -429,6 +444,27 @@ html[data-vt="reveal"]::view-transition-new(root) {
   to {
     clip-path: circle(var(--vt-r, 150%) at var(--vt-x, 50%) var(--vt-y, 50%));
   }
+}
+/* View transitions are off on Linux (WebKitGTK never runs their update callback; see
+   util/transition.ts). The arriving page animates in with the same curves the snapshots
+   use, directly on the real .content. Only the arrival animates: with no snapshot there
+   is no old frame to move out. html.vt-fallback is on only while a fallback runs. */
+html.vt-fallback[data-vt="forward"]:not([data-vt-pane="1"]) .pane[data-pane="0"] .content,
+html.vt-fallback[data-vt="forward"]:not([data-vt-pane="0"]) .pane[data-pane="1"] .content {
+  animation: wf-vt-in-right var(--dur-page-in) var(--ease-out) var(--dur-page-delay) both;
+}
+html.vt-fallback[data-vt="back"]:not([data-vt-pane="1"]) .pane[data-pane="0"] .content,
+html.vt-fallback[data-vt="back"]:not([data-vt-pane="0"]) .pane[data-pane="1"] .content {
+  animation: wf-vt-in-left var(--dur-page-in) var(--ease-out) var(--dur-page-delay) both;
+}
+html.vt-fallback[data-vt="fade"]:not([data-vt-pane="1"]) .pane[data-pane="0"] .content,
+html.vt-fallback[data-vt="fade"]:not([data-vt-pane="0"]) .pane[data-pane="1"] .content {
+  animation: wf-vt-in-up var(--dur-page-in) var(--ease-out) var(--dur-page-delay) both;
+}
+/* A view switch that carries icons (util/viewMorph.ts) holds the page fade off for one
+   frame, so the flying icons are measured at rest. */
+html.vt-morphing .content {
+  animation: none !important;
 }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
@@ -870,7 +906,7 @@ body > .fui-FluentProvider {
 }
 /* The bar folds in steps as it narrows (small windows, large text): Compare and Split drop their words,
    then the other edit commands, then Sort/View/Filter, then New, and last the pattern button hides
-   (⇧⌘S, the Edit menu and the palette still reach it). rem tracks the text size.
+   (Ctrl+Shift+S, the Edit menu and the palette still reach it). rem tracks the text size.
    A toggle that is on (Split, in split view) keeps its word. Hidden labels stay in the accessibility tree
    and `title` gives a tooltip. CommandBar.visual.tsx checks that the bar fits at every width. */
 .commandbar {
@@ -3616,8 +3652,6 @@ html[data-vt="back"] .content.cols {
   overflow-y: auto;
   padding: 0.286rem;
   background: var(--menu-bg);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  backdrop-filter: blur(24px) saturate(1.3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-l);
   box-shadow: var(--shadow);
@@ -3738,8 +3772,6 @@ body .fui-MenuPopover {
   padding: 0.286rem;
   min-width: 11.429rem;
   background: var(--menu-bg);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  backdrop-filter: blur(24px) saturate(1.3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-l);
   box-shadow: var(--shadow);
@@ -6707,6 +6739,95 @@ body .fui-Tooltip {
   }
 }
 
+/* The document itself, drawn by pdf.js where a native PDFKit view sat. The area around the pages
+   keeps the colour the native view was given: paper grey in the light, deep grey in the dark. */
+.pv-doc-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: #e8e8e8;
+}
+[data-theme="dark"] .pv-doc-row {
+  background: #1d2027;
+}
+.pv-side {
+  flex: none;
+  width: 10.5rem;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.571rem;
+  padding: 0.571rem 0.571rem;
+  border-right: 1px solid var(--border);
+}
+.pv-thumb {
+  flex: none;
+  max-width: 100%;
+  padding: 0.286rem;
+  border: none;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+.pv-thumb:hover {
+  background: var(--sel-fill);
+}
+.pv-thumb.on {
+  background: var(--sel-fill);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pv-thumb canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.pv-doc {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  outline: none;
+  padding: 0.571rem;
+  scroll-padding: 0.571rem;
+}
+.pv-doc-pages {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Auto margins keep an oversized page reachable on both sides when it overflows. */
+  align-items: safe center;
+  gap: 0.571rem;
+  min-width: -moz-fit-content;
+  min-width: fit-content;
+}
+.pv-doc-pages.two {
+  flex-flow: row wrap;
+  justify-content: safe center;
+  align-content: flex-start;
+}
+.pv-page-box {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+.pv-page-box canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pv-mark {
+  position: absolute;
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  animation: pv-in var(--dur-slow) var(--ease-out) both;
+}
+
 .vp-stage {
   flex: 1;
   min-height: 0;
@@ -7664,6 +7785,12 @@ video.pv-picture {
 .field-hint {
   color: var(--text-2);
   font-size: 0.929rem;
+}
+
+/* The open-with chooser: Send to rows, capped so the dialog stays small. */
+.send-to-list.app-picker {
+  max-height: 17rem;
+  overflow: auto;
 }
 
 /* Duplicate files on the Disk usage page: one block per set of equal files. */

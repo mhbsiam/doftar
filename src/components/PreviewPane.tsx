@@ -22,7 +22,9 @@ import { basename, formatDate, formatSize } from "../util/format";
 import { fileKind, isPlayableVideo, typeLabel } from "../util/kinds";
 import { readable } from "../util/readable";
 import type { FileEntry } from "../types";
-import { EntryIcon, newThumbId } from "./FileIcon";
+import type { RenderTask } from "pdfjs-dist";
+import type { PageSize, PdfDocument } from "../util/pdf";
+import { EntryIcon } from "./FileIcon";
 import { MetadataRows, Row } from "./Dialogs";
 import { useItemInfo } from "../hooks/useItemInfo";
 import type { Doc } from "./DocBody";
@@ -43,6 +45,7 @@ const ZOOM_LIMITS: Partial<Record<Shown["kind"], { min: number; max: number }>> 
 };
 /** Long sides a PDF page is drawn at. The smallest that stays sharp is used. */
 const PDF_PAGE_PX = [800, 1600, 3200];
+/** Long sides a PDF page is drawn at. The smallest that stays sharp is used. */
 const MIN_REM = 16;
 const MAX_REM = 60;
 const INFO_MAX = 0.75;
@@ -187,13 +190,11 @@ function Resizer({ slot, width }: { slot: RefObject<HTMLDivElement | null>; widt
   );
 }
 
-type PageSize = { w: number; h: number };
-
 type Shown =
   | { kind: "loading" }
   | { kind: "doc"; doc: Doc }
   | { kind: "picture"; src: string }
-  | { kind: "pdf"; pages: PageSize[] }
+  | { kind: "pdf"; doc: PdfDocument; pages: PageSize[] }
   | { kind: "video"; src: string }
   | { kind: "icon" }
   | { kind: "failed"; message: string };
@@ -219,14 +220,23 @@ async function follow(href: string, docPath: string, stage: HTMLElement) {
   }
 }
 
-/** The reader draws text and data. Quick Look draws anything else as a picture. */
+/** The reader draws text and data. Anything else is drawn here: PDFs by pdf.js, the rest from a thumbnail. */
 async function load(entry: FileEntry): Promise<Shown> {
   const { path, ext } = entry;
   if (isPlayableVideo(ext)) return { kind: "video", src: convertFileSrc(path) };
-  // A PDF with a password, or still in the cloud, shows its Quick Look picture below.
+  // A PDF with a password, or one that can't be read, falls through to its thumbnail or icon below.
   if (fileKind(ext) === "pdf") {
-    const pages = await api.pdfPageSizes(path).catch(() => null);
-    if (pages?.length) return { kind: "pdf", pages };
+    // Loaded apart, so the file manager never pays for pdf.js before a PDF is previewed.
+    const { openDoc, pageSizes } = await import("../util/pdf");
+    const task = openDoc(path);
+    try {
+      const doc = await task.promise;
+      const pages = await pageSizes(doc);
+      if (pages.length) return { kind: "pdf", doc, pages };
+      void doc.destroy().catch(() => {});
+    } catch {
+      // Locked or unreadable.
+    }
   }
   if (await readable(path)) {
     return { kind: "doc", doc: { path, ...(await api.readDocument(path)) } };
@@ -239,7 +249,7 @@ async function load(entry: FileEntry): Promise<Shown> {
 }
 
 /**
- * Zoom for what the stage shows: pinch, ⌘/Ctrl + scroll, or `zoomTo`.
+ * Zoom for what the stage shows: pinch, Ctrl+/Ctrl + scroll, or `zoomTo`.
  * What is under the pointer stays there. `fit` is the picture's size before it was zoomed.
  */
 function useStageZoom(stage: RefObject<HTMLDivElement | null>, kind: Shown["kind"]) {
@@ -318,21 +328,19 @@ function useStageZoom(stage: RefObject<HTMLDivElement | null>, kind: Shown["kind
 
 /** One PDF page. It is drawn only near the view, so a long document stays light. */
 const PdfSheet = memo(function PdfSheet({
-  path,
-  modifiedMs,
+  doc,
   index,
   page,
   px,
 }: {
-  path: string;
-  modifiedMs: number;
+  doc: PdfDocument;
   index: number;
   page: PageSize;
   px: number;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
   const [near, setNear] = useState(false);
-  const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     const el = sheet.current!;
     // The newest change comes last. A busy page can get several at once.
@@ -344,44 +352,39 @@ const PdfSheet = memo(function PdfSheet({
     return () => io.disconnect();
   }, []);
   useEffect(() => {
-    if (!near) {
-      setSrc(null);
-      return;
-    }
-    const id = newThumbId();
-    let waiting = true;
-    api
-      .pdfPagePicture(path, index, px, id)
-      .then((file) => waiting && setSrc(convertFileSrc(file)))
-      .catch(() => {})
-      .finally(() => {
-        waiting = false;
-      });
-    // Fast scrolling leaves no queue of pages.
+    if (!near) return;
+    let task: RenderTask | null = null;
+    let stale = false;
+    void (async () => {
+      try {
+        const drawn = await doc.getPage(index + 1);
+        if (stale) return;
+        const el = canvas.current!;
+        // `px` is the long side in device pixels, so it is the scale already.
+        const vp = drawn.getViewport({ scale: px / Math.max(page.w, page.h) });
+        el.width = Math.max(1, Math.round(vp.width));
+        el.height = Math.max(1, Math.round(vp.height));
+        task = drawn.render({ canvasContext: el.getContext("2d")!, viewport: vp });
+        await task.promise;
+      } catch {
+        // A cancelled render throws; the next one draws over it.
+      }
+    })();
+    // Fast scrolling leaves no queue of renders.
     return () => {
-      if (waiting) void api.cancelThumbnail(id).catch(() => {});
-      waiting = false;
+      stale = true;
+      task?.cancel();
     };
-  }, [near, path, modifiedMs, index, px]);
+  }, [near, doc, index, page.w, page.h, px]);
   return (
     <div ref={sheet} className="pv-sheet" style={{ aspectRatio: `${page.w} / ${page.h}` }}>
-      {src && <img src={src} alt={`Page ${index + 1}`} draggable={false} />}
+      <canvas ref={canvas} style={{ width: "100%", height: "100%" }} />
     </div>
   );
 });
 
 /** All of a PDF's pages, each as wide as the bar times `zoom`. */
-function PdfPages({
-  path,
-  modifiedMs,
-  pages,
-  zoom,
-}: {
-  path: string;
-  modifiedMs: number;
-  pages: PageSize[];
-  zoom: number;
-}) {
+function PdfPages({ doc, pages, zoom }: { doc: PdfDocument; pages: PageSize[]; zoom: number }) {
   const bar = useSettings((s) => s.previewWidth);
   const wide = bar * remPx() * zoom * window.devicePixelRatio;
   return (
@@ -389,8 +392,7 @@ function PdfPages({
       {pages.map((page, i) => (
         <PdfSheet
           key={i}
-          path={path}
-          modifiedMs={modifiedMs}
+          doc={doc}
           index={i}
           page={page}
           px={PDF_PAGE_PX.find((px) => px >= (wide * Math.max(page.w, page.h)) / page.w) ?? PDF_PAGE_PX[2]}
@@ -423,13 +425,29 @@ function Preview({ entry }: { entry: FileEntry }) {
       live = false;
     };
   }, [enlarged, entry]);
+  // The pdf.js document behind the shown PDF. A replaced one is closed, so the worker frees its memory.
+  const pdfDoc = useRef<PdfDocument | null>(null);
+  useEffect(() => {
+    const doc = shown.kind === "pdf" ? shown.doc : null;
+    const was = pdfDoc.current;
+    pdfDoc.current = doc;
+    if (was && was !== doc) void was.destroy().catch(() => {});
+  }, [shown]);
+  useEffect(() => () => void pdfDoc.current?.destroy().catch(() => {}), []);
   useEffect(() => {
     let live = true;
     load(entry)
       .catch((err: unknown) => ({ kind: "failed", message: String(err) }) as const)
-      // A PDF being rewritten can't be read for a moment. Keep its pages, and the place in them.
-      // shortcut: a PDF that later gains a password keeps its old pages until it is reopened.
-      .then((s) => live && setShown((now) => (now.kind === "pdf" && s.kind !== "pdf" ? now : s)));
+      .then((s) => {
+        if (!live) {
+          // Never shown, so its document goes back at once.
+          if (s.kind === "pdf") void s.doc.destroy().catch(() => {});
+          return;
+        }
+        // A PDF being rewritten can't be read for a moment. Keep its pages, and the place in them.
+        // shortcut: a PDF that later gains a password keeps its old pages until it is reopened.
+        setShown((now) => (now.kind === "pdf" && s.kind !== "pdf" ? now : s));
+      });
     return () => {
       live = false;
     };
@@ -464,9 +482,7 @@ function Preview({ entry }: { entry: FileEntry }) {
               <DocArticle doc={shown.doc} tree={json} className="pv-in" zoom={zoom} />
             </Suspense>
           )}
-          {shown.kind === "pdf" && (
-            <PdfPages path={entry.path} modifiedMs={entry.modifiedMs} pages={shown.pages} zoom={zoom} />
-          )}
+          {shown.kind === "pdf" && <PdfPages doc={shown.doc} pages={shown.pages} zoom={zoom} />}
           {shown.kind === "picture" && (
             <img
               className="pv-picture pv-in"

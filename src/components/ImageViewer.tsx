@@ -28,9 +28,9 @@ import { useViewerTheme } from "../hooks/useResolvedTheme";
 import { extOf, isEditableImage } from "../util/kinds";
 import { dur } from "../util/motion";
 import { swipeTracker } from "../util/swipe";
+import { logUiError } from "../util/uiErrors";
 import type { ImageEdit, PixelRect, ViewerOpen } from "../types";
 
-const PREVIEW_APP = "/System/Applications/Preview.app";
 /** WebKit cannot decode these. Use a converted copy. */
 const NEEDS_COPY = new Set(["dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2"]);
 const MAX_SCALE = 16;
@@ -201,7 +201,7 @@ function clampPan(box: Size, stage: Size, scale: number, x: number, y: number) {
 }
 
 function openInPreview(path: string | null) {
-  if (path) void api.openWith([path], PREVIEW_APP).catch(console.error);
+  if (path) void api.openPath(path).catch(console.error);
 }
 
 /** The viewer window page. The window starts hidden and hides on close, so an image opens fast. */
@@ -482,7 +482,10 @@ export function ImageViewer() {
           })
         );
       })
-      .catch(() => {});
+      .catch((err) => {
+        // A dead ready command means the first image never lands here and the window sits blank. Say so in the log.
+        logUiError("viewer ready", err);
+      });
     return () => void unOpen.then((f) => f());
   }, [open, guard]);
 
@@ -791,7 +794,7 @@ export function ImageViewer() {
       if (savingRef.current && saveRun.current) return saveRun.current;
       const path = currentRef.current;
       if (!path || !dirtyRef.current || croppingRef.current) return Promise.resolve(false);
-      // Set now, not on render, so a second ⌘S cannot start another save.
+      // Set now, not on render, so a second Ctrl+S cannot start another save.
       savingRef.current = true;
       setSaving(true);
       const run = (async () => {
@@ -853,7 +856,7 @@ export function ImageViewer() {
     // A crop still in progress is not part of the edits.
     setCropping(null);
     croppingRef.current = null;
-    // A running ⌘S counts as a save.
+    // A running Ctrl+S counts as a save.
     if (choice === "save" && dirtyRef.current && !(await save(false))) return;
     // The prompt was dismissed during the save. Stop.
     if (promptRef.current !== p) return;
@@ -919,7 +922,7 @@ export function ImageViewer() {
     return () => window.removeEventListener("keydown", onKey);
   }, [step, zoom, save, rotate, flip, finishCrop, startCrop, guard, closeNow]);
 
-  // Pinch or ⌘/Ctrl + scroll zooms. Scroll pans a zoomed image.
+  // Pinch or Ctrl+scroll zooms. Scroll pans a zoomed image.
   // A sideways two-finger swipe changes image when it fits.
   useEffect(() => {
     const el = stageRef.current;
@@ -1137,7 +1140,7 @@ export function ImageViewer() {
                 onClick={() => zoom((s) => s / ZOOM_STEP)}
                 disabled={!nat || !zoomed}
                 aria-label="Zoom out"
-                title="Zoom out (⌘−)"
+                title="Zoom out (Ctrl+−)"
               >
                 <ZoomOutRegular />
               </button>
@@ -1149,7 +1152,7 @@ export function ImageViewer() {
                 onClick={() => zoom((s) => s * ZOOM_STEP)}
                 disabled={!nat || scale >= MAX_SCALE}
                 aria-label="Zoom in"
-                title="Zoom in (⌘+)"
+                title="Zoom in (Ctrl+=)"
               >
                 <ZoomInRegular />
               </button>
@@ -1158,7 +1161,7 @@ export function ImageViewer() {
                 onClick={() => setView(FIT)}
                 disabled={!nat || !zoomed}
                 aria-label="Fit to window"
-                title="Fit to window (⌘0)"
+                title="Fit to window (Ctrl+0)"
               >
                 <ZoomFitRegular />
               </button>
@@ -1239,7 +1242,7 @@ export function ImageViewer() {
                     onClick={() => void save(true)}
                     disabled={busy}
                     aria-label="Save as a copy"
-                    title="Save as a copy (⇧⌘S)"
+                    title="Save as a copy (Ctrl+Shift+S)"
                   >
                     <SaveCopyRegular />
                   </button>
@@ -1247,7 +1250,7 @@ export function ImageViewer() {
                     className="iv-btn wide primary"
                     onClick={() => void save(false)}
                     disabled={busy}
-                    title="Save over the original (⌘S)"
+                    title="Save over the original (Ctrl+S)"
                   >
                     {saving ? "Saving…" : "Save"}
                   </button>
@@ -1257,10 +1260,10 @@ export function ImageViewer() {
                   className="iv-btn wide"
                   onClick={() => openInPreview(current)}
                   disabled={!current}
-                  title="Open in Preview"
+                  title="Open in default app"
                 >
                   <OpenRegular />
-                  <span>Open in Preview</span>
+                  <span>Open in default app</span>
                 </button>
               )}
             </>
@@ -1354,7 +1357,7 @@ export function ImageViewer() {
             <ImageOffRegular />
             <span>Doftar can't show this image</span>
             <button className="iv-btn wide" onClick={() => openInPreview(current)}>
-              Open in Preview
+              Open in default app
             </button>
           </div>
         )}

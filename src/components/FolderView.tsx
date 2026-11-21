@@ -18,7 +18,6 @@ import {
   FolderZipRegular,
   FolderRegular,
   InfoRegular,
-  ShareIosRegular,
   HeartFilled,
   HeartRegular,
   TableRegular,
@@ -56,7 +55,6 @@ import {
   showFolderTree,
   getViewEntries,
   isExtractable,
-  isInstalledApp,
   isInTrash,
   isTrashDir,
   newFile,
@@ -65,17 +63,14 @@ import {
   showArchiveContents,
   activateEntry,
   openEntry,
-  openFullDiskAccessSettings,
   openWith,
   openWithOther,
-  shareItems,
   paste,
   putBackSelection,
   refreshByUser,
   setViewEntries,
   startRename,
   toggleFavoriteEntry,
-  uninstallApps,
 } from "../actions";
 import type { FileEntry, SortKey } from "../types";
 import { isFolder, isSheet } from "../util/kinds";
@@ -275,20 +270,11 @@ export function FolderView({
 
   if (error) {
     const here = tab.location.kind === "path" ? tab.location.path : null;
-    // macOS guards the Trash with Full Disk Access, not Files and Folders.
     if (isInTrash(here)) {
       return (
         <div className="content empty-state">
           <h2>Can't open the Trash</h2>
           <p>{error}</p>
-          <p className="hint">
-            macOS only lets apps read the Trash with Full Disk Access. Turn on
-            Doftar in System Settings → Privacy &amp; Security → Full Disk
-            Access, then reopen the Trash.
-          </p>
-          <button className="btn accent" onClick={() => openFullDiskAccessSettings()}>
-            Open Privacy Settings
-          </button>
         </div>
       );
     }
@@ -296,11 +282,6 @@ export function FolderView({
       <div className="content empty-state">
         <h2>Can't open this folder</h2>
         <p>{error}</p>
-        <p className="hint">
-          If this is a protected folder (Desktop, Documents, Downloads…),
-          grant access in System Settings → Privacy &amp; Security → Files and
-          Folders.
-        </p>
       </div>
     );
   }
@@ -347,7 +328,7 @@ export function FolderView({
         key: "paste",
         label: "Paste",
         icon: <ClipboardPasteRegular />,
-        keys: "⌘V",
+        keys: "Ctrl+V",
         onSelect: () => paste(),
       },
       { key: "d1", dividerBefore: true },
@@ -545,7 +526,6 @@ export function ShotsLoading({ icon, label }: { icon: React.ReactElement; label:
   );
 }
 
-const pointAt = (x: number, y: number) => ({ x, y, width: 1, height: 1 });
 
 async function openRowMenu(x: number, y: number, entry: FileEntry) {
   {
@@ -568,11 +548,10 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
     const multi = cur.selection.length > 1 && cur.selection.includes(entry.path);
     const targets = multi ? [...cur.selection] : [entry.path];
     const commands: CommandSpec[] = [
-      { key: "cut", label: "Cut (⌘X)", icon: <CutRegular />, onSelect: () => cutSelection() },
-      { key: "copy", label: "Copy (⌘C)", icon: <CopyRegular />, onSelect: () => copySelection() },
+      { key: "cut", label: "Cut (Ctrl+X)", icon: <CutRegular />, onSelect: () => cutSelection() },
+      { key: "copy", label: "Copy (Ctrl+C)", icon: <CopyRegular />, onSelect: () => copySelection() },
       { key: "rename", label: multi ? "Rename… (F2)" : "Rename (F2)", icon: <EditRegular />, onSelect: () => startRename() },
-      { key: "share", label: "Share", icon: <ShareIosRegular />, onSelect: () => shareItems(targets, pointAt(x, y)) },
-      { key: "delete", label: "Move to Trash (⌘⌫)", icon: <DeleteRegular />, danger: true, onSelect: () => deleteSelection(false) },
+      { key: "delete", label: "Move to Trash (Ctrl+Backspace)", icon: <DeleteRegular />, danger: true, onSelect: () => deleteSelection(false) },
     ];
     const inTrash = isTrashDir(parentOf(entry.path));
     const inResults =
@@ -581,8 +560,7 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         tabs.deepSearch === cur.location.path &&
         tabs.search.trim() !== "") ||
       cur.location.kind === "tags" ||
-      cur.location.kind === "screenshots" ||
-      (tagFilterActive(cur.tagFilter) && cur.tagFilter.deep);
+      cur.location.kind === "screenshots";
     const chosen = new Set(targets);
     const shown = getViewEntries().filter((e) => chosen.has(e.path));
     const items: MenuItemSpec[] = [
@@ -685,7 +663,7 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         : []),
       {
         key: "finder",
-        label: "Reveal in Finder",
+        label: "Reveal in File Manager",
         icon: <WindowNewRegular />,
         keys: keysOf("reveal_in_finder"),
         onSelect: () => revealInFinder(targets),
@@ -725,7 +703,7 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         icon: <ArchiveRegular />,
         onSelect: () => void compressItems(targets),
       },
-      ...(!multi && isExtractable(entry)
+      ...(!multi && (await isExtractable(entry))
         ? [
             {
               key: "archive-contents",
@@ -747,7 +725,7 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         icon: <CopyRegular />,
         dividerBefore: true,
         items: [
-          { key: "copy-path", label: "Path", icon: <CopyRegular />, keys: "⌥⌘C", onSelect: () => copyAsPath(targets) },
+          { key: "copy-path", label: "Path", icon: <CopyRegular />, keys: "Ctrl+Alt+C", onSelect: () => copyAsPath(targets) },
           { key: "copy-name", label: multi ? "Names" : "Name", icon: <TextTRegular />, onSelect: () => copyName(targets) },
         ],
       },
@@ -767,21 +745,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         keys: keysOf("get_info"),
         onSelect: () => ui.openProperties(multi ? shown : entry),
       },
-      ...(isInstalledApp(entry)
-        ? [
-            {
-              key: "uninstall",
-              label: "Uninstall",
-              icon: <DeleteRegular />,
-              dividerBefore: true,
-              onSelect: () => {
-                const chosen = new Set(targets);
-                const apps = getViewEntries().filter((e) => chosen.has(e.path) && isInstalledApp(e));
-                uninstallApps(apps.map((a) => a.path));
-              },
-            },
-          ]
-        : []),
     ];
     ui.openContextMenu(x, y, items, commands);
   }

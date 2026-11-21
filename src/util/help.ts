@@ -1,8 +1,10 @@
 /**
- * The Help page (Settings → Help, Help → Doftar Help, ⌘K "Help").
+ * The Help page (Settings → Help, Help → Doftar Help, Ctrl+K "Help").
  * How each feature behaves, the best way to use it, and what it won't do.
  * Every number here comes from the code. Change both together.
  */
+import { ON_LINUX } from "./platform";
+
 export interface HelpTopic {
   title: string;
   points: string[];
@@ -18,28 +20,26 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Copy, cut and paste",
         points: [
           "Cut doesn't touch your files. They move only when you paste.",
-          "The clipboard is shared with Finder both ways. Files cut in Finder arrive as a copy, because Finder doesn't share its cut.",
           "If you copy anything else before pasting, the cut becomes a copy.",
           "After a paste, items that were skipped or failed stay on the clipboard, so you can paste them again.",
-          "Copying into the same folder makes “name_copy_1”, and so does Duplicate (⌘D). Cut and paste into the same folder does nothing.",
-          "⌘⌥V moves the clipboard items here, even after a copy. ⌘⇧V opens Activity, with the last 20 things you copied this session.",
-          "With no files on the clipboard, Paste saves a copied image or text as a new file here: “Pasted Image <date>.png” or “Pasted Text <date>.txt”.",
+          "Copying into the same folder makes “name_copy_1”, and so does Duplicate (Ctrl+D). Cut and paste into the same folder does nothing.",
+          "Ctrl+Alt+V moves the clipboard items here, even after a copy. Ctrl+Shift+V opens Activity, with the last 20 things you copied this session.",
           "Move to… and Copy to… on the right-click menu send the selection to a folder you type or pick. Tab completes the path.",
-          "New Folder with Selection (⌃⌘N) makes a folder and moves the selected items into it. One Undo puts them back.",
+          "New Folder with Selection (Ctrl+Alt+Shift+N) makes a folder and moves the selected items into it. One Undo puts them back.",
         ],
         tip: "Cut, then paste straight away.",
-        limits: ["A pasted image is saved as PNG, or as TIFF when the app that copied it offers only that. Pasted text is plain UTF-8.", "A clipboard of more than 200 MB isn't saved."],
+        limits: ["Paste takes files only. A copied image or text isn't saved as a new file."],
       },
       {
         title: "Same drive or another drive",
         points: [
-          "On the same drive, a move is instant. Copies on APFS drives are instant too and take no extra space until one side changes.",
+          "On the same drive, a move is instant. A copy always writes every byte, even on the same drive.",
           "To another drive, Doftar copies, checks every item and byte arrived, and only then deletes the original. If the original changed meanwhile, both are kept and you're told.",
-          "Copies keep tags, permissions, extended attributes and the “downloaded from the internet” mark. Symlinks are copied as links.",
+          "Copies keep permissions, modification times and extended attributes. Symlinks are copied as links.",
           "Before copying to another drive, Doftar adds up the sizes. If the drive is too full it stops and tells you how much is missing.",
           "File → Verify Copies to Other Drives reads both sides again after each copy or move and compares their SHA-256. A copy that differs is removed and the original stays.",
         ],
-        limits: ["Verifying takes about twice as long, so it is off until you turn it on. It doesn't run on the same drive, where a copy shares the original's data."],
+        limits: ["Verifying takes about twice as long, so it is off until you turn it on. It doesn't run for copies on the same drive."],
       },
       {
         title: "When a name is taken",
@@ -52,7 +52,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Drag and drop",
         points: [
-          "Dragging moves on the same drive and copies to another drive. Hold Option to copy instead.",
+          `Dragging moves on the same drive and copies to another drive. Hold ${ON_LINUX ? "Alt" : "Option"} to copy instead.`,
           "Moving folders by dragging asks first.",
           "Hold over a tab or folder for a moment to open it while you drag.",
           "Drop on Trash to delete, or drop a folder on Favorites to pin it.",
@@ -64,7 +64,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         points: [
           "Each copy or move runs on its own and shows its progress, speed and time left. The folder it fills shows a small ring on its icon.",
           "Pause holds a copy or move between files, or partway through a large one. Resume carries on from there.",
-          "The Mac doesn't go to sleep by itself while a job runs. Closing the lid still sleeps it.",
+          "Long jobs don't keep the computer awake; its normal sleep settings still apply.",
           "Cancel stops between items and removes the half-copied one. What finished stays, and the Undo button removes it.",
           "Quitting cancels running copies. After a crash, half-copied items are removed the next time Doftar opens.",
         ],
@@ -76,7 +76,6 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Compress makes a ZIP next to the first selected item.",
           "Show contents lists what an archive holds, with sizes and a search, without extracting it.",
           "Extract opens zip, tar (gz, bz2, xz), 7-Zip, RAR, ISO, CAB, XAR, CPIO and LZH. A single item lands beside the archive. Several go into a folder named after it.",
-          "Files from a downloaded archive keep the “downloaded” mark, so macOS still checks any app inside.",
           "Archives that try to write outside their folder, through links, or far more than they declare are stopped.",
         ],
         limits: ["ZIP is the only format Doftar makes, without a password.", "Password-protected archives aren't supported.", "Show contents lists the first 50,000 entries. One file can't be extracted on its own."],
@@ -89,8 +88,8 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Trash or delete",
         points: [
-          "⌘⌫ moves items to the Trash. It asks first for 100 or more items, or anything in a cloud drive, where deleting removes it on every device.",
-          "Delete immediately (⌘⌥⌫) can't be undone. Deleting inside the Trash is always permanent.",
+          "Ctrl+Backspace moves items to the Trash. It asks first for 100 or more items, or anything in a cloud drive, where deleting removes it on every device.",
+          "Delete immediately (Ctrl+Alt+Backspace) can't be undone. Deleting inside the Trash is always permanent.",
           "Network drives have no Trash, so Doftar offers to delete immediately instead.",
           "Deleting a Git repository permanently asks a second time.",
           "Empty Trash empties your Trash and the Trash on every connected drive.",
@@ -101,14 +100,14 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         points: [
           "Items return to the folder they came from. If that folder is gone, Doftar offers to make it again.",
           "Put Back stops for an item whose name is taken where it would go.",
-          "If Doftar did not record where an item came from, it offers to show the item in Finder.",
+          "If Doftar did not record where an item came from, it can only show the item in the Trash.",
         ],
       },
       {
         title: "Undo and Redo",
         points: [
           "Undo remembers the last 50 operations, even after a restart. Redo is lost when Doftar quits.",
-          "⌘Z tells you what it will do before doing it. The Undo button on a notice doesn't ask.",
+          "Ctrl+Z tells you what it will do before doing it. The Undo button on a notice doesn't ask.",
           "Undoing a copy or a new item moves it to the Trash. Undo never deletes.",
           "Items that were moved, replaced or deleted since are skipped, and Undo says which.",
           "All windows share one Undo history.",
@@ -118,7 +117,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Protected folders",
         points: [
-          "Doftar never moves, renames or deletes system folders, drives themselves, your home folder, or its standard folders: Desktop, Documents, Downloads, Library, Movies, Music, Pictures and Public.",
+          "Doftar never moves, renames or deletes system folders, drives themselves, your home folder, or its standard folders: Desktop, Documents, Downloads, Music, Pictures, Public, Templates, Videos, snap, .config, .local, .ssh and .gnupg.",
           "You can still copy from them, and change what's inside your own folders.",
         ],
       },
@@ -157,7 +156,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Split view",
         points: [
-          "⌘\\ shows two folders side by side. The new side starts as a copy of the current tab, history included.",
+          "Ctrl+\\ shows two folders side by side. The new side starts as a copy of the current tab, history included.",
           "If the screen has room, the window grows to make room for the new side, and shrinks back when split view closes. If not, the window stays the same and the two sides share it.",
           "Esc closes split view and keeps the side you are on. If a cut is waiting, the first Esc cancels the cut.",
           "Each side has its own tabs and search. The window has one preview bar, at its right edge. While it's open, the right side's navigation pane is hidden. It comes back when you close the bar.",
@@ -171,10 +170,10 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Each tab has its own Back and Forward, and remembers the scroll, selection and filters of every step.",
           "A sideways two-finger swipe over the files goes Back and Forward, as the mouse side buttons do. An arrow shows where it goes. A list that scrolls sideways keeps the swipe. Settings → Files turns the swipe off.",
           "Drag a tab to the other side, onto another window's tab strip, or out to open it in a new window.",
-          "Closing the last tab of the main window opens Home instead. ⌘⇧T reopens closed tabs, newest first, with their history.",
-          "Right-click a tab to close the other tabs, or the tabs to its right. ⌃Tab and ⌃⇧Tab, or ⌘⇧] and ⌘⇧[, move between tabs.",
-          "⌘N opens a new window on Home.",
-          "A folder from outside opens in a new tab of the main window: drop it on the Dock icon, or run open -a Doftar with the folder in Terminal. In Finder, right-click an item and choose Services, then Reveal in Doftar, to show it in its folder.",
+          "Closing the last tab of the main window opens Home instead. Ctrl+Shift+T reopens closed tabs, newest first, with their history.",
+          "Right-click a tab to close the other tabs, or the tabs to its right. Ctrl+Tab and Ctrl+Shift+Tab, or Ctrl+Shift+] and Ctrl+Shift+[, move between tabs.",
+          "Ctrl+N opens a new window on Home.",
+          "A folder path passed on the command line opens in a new tab of the main window.",
           "The main window's tabs and size come back at the next launch. It always opens in one pane, with both sides' tabs if you quit in split view. Tabs whose folder is gone or in the Trash are left out.",
           "Settings, favorites, recents, the clipboard and Undo are shared by all windows.",
           "View, sort, grouping, icon size and list column widths are remembered for each folder.",
@@ -187,26 +186,19 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
     ],
   },
   {
-    title: "Preview bar and Quick Look",
+    title: "Preview bar",
     topics: [
       {
         title: "Preview bar",
         points: [
-          "⇧⌘P turns the preview bar on. While it's on, double-click or Enter shows a file beside the list instead of opening it. Folders still open.",
-          "Text, code, Markdown and data files show in the reader. JSON shows as a tree. Video and audio play. Everything else shows a Quick Look picture.",
-          "Pinch, ⌘-scroll or use the buttons that appear under the pointer to zoom text, pictures and PDFs. Scroll a PDF to read all of its pages.",
-          "Pull the drawer up for dates, size on disk, the default app and where a file was downloaded from.",
+          "Ctrl+Shift+P turns the preview bar on. While it's on, double-click or Enter shows a file beside the list instead of opening it. Folders still open.",
+          "Text, code, Markdown and data files show in the reader. JSON shows as a tree. Video and audio play.",
+          "Pinch, Ctrl+-scroll or use the buttons that appear under the pointer to zoom text and pictures.",
+          "Pull the drawer up for dates, size on disk and the default app.",
           "The preview follows changes to the file. The preview bar and the folder tree share the space, so opening one closes the other.",
           "Drag its edge to resize it. Double-click the edge to reset.",
         ],
-        limits: ["Text files over 8 MB aren't shown.", "Files only in the cloud are downloaded before they show.", "PDFs with a password show one picture. Open the PDF to read or select its text."],
-      },
-      {
-        title: "Quick Look",
-        points: [
-          "Tap Space to open or close Quick Look. Hold Space to peek, and let go to close.",
-          "It shows up to 50 selected items.",
-        ],
+        limits: ["Text files over 8 MB aren't shown."],
       },
     ],
   },
@@ -216,7 +208,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Compare folders",
         points: [
-          "In split view, right-click empty space or use ⌘K. Both sides must show different folders, with no search or filter.",
+          "In split view, right-click empty space or use Ctrl+K. Both sides must show different folders, with no search or filter.",
           "Doftar selects, on each side, what the other side lacks or has an older copy of, then offers to copy it across.",
           "Names match without regard to case. “Older” means modified earlier, with 2 seconds to spare for drives that round times.",
         ],
@@ -254,36 +246,33 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Search",
         points: [
           "Typing in the search box filters the open folder as you type.",
-          "Press Enter to search every folder inside it. Doftar asks Spotlight first, and looks through the folders itself where Spotlight has no index.",
+          "Press Enter to search every folder inside it. Doftar looks through the folders itself.",
           "Search matches names. Turn on Contents to also match words inside files. Doftar then searches subfolders too.",
-          "Hidden items are skipped unless shown. Apps and symlinked folders aren't searched inside.",
+          "Hidden items are skipped unless shown. Symlinked folders aren't searched inside.",
           "Kind and date filters narrow a search too. Documents means PDFs, Office files and text. Today means since midnight.",
           "The star beside Subfolders saves the search in the sidebar under Searches. Clicking it runs the search again.",
         ],
         tip: "For a common name, search a smaller folder or add a kind filter.",
         limits: [
           "Up to 5,000 results.",
-          "Contents covers only text Spotlight has indexed, and matches the start of words. Where Spotlight has no index, only names match.",
-          "Without Spotlight, the search stops after 400,000 items or 20 seconds.",
+          "The search stops after 400,000 items or 20 seconds.",
         ],
       },
       {
         title: "Selecting",
         points: [
-          "Select by Pattern (⌘⇧S, or the * button next to the command palette button) selects the shown items whose names match. * is any text, ? is one character, and commas separate patterns: *.csv, report-??.",
+          "Select by Pattern (Ctrl+Shift+S, or the * button next to the command palette button) selects the shown items whose names match. * is any text, ? is one character, and commas separate patterns: *.csv, report-??.",
           "A pattern with no * or ? matches names that contain it. Letter case doesn't matter.",
-          "Invert Selection (⌘⇧I) selects everything shown that isn't selected.",
+          "Invert Selection (Ctrl+Shift+I) selects everything shown that isn't selected.",
         ],
         limits: ["Both act on what the folder shows, so a filter or search narrows them."],
       },
       {
-        title: "Tags and Screenshots",
+        title: "Screenshots",
         points: [
-          "The Tags page asks Spotlight for every tagged file on the Mac.",
           "The Screenshots page lists images named “Screenshot…” in your home folder.",
         ],
         limits: [
-          "Drives Spotlight doesn't index are left out of the Tags page.",
           "Renamed screenshots, or ones saved outside your home folder, aren't listed.",
         ],
       },
@@ -297,13 +286,12 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         points: [
           "Click the empty part of the path to type. Anything starting with ~, /, . or .. is a place: a folder opens, a file is shown in its folder.",
           "Folder names complete as you type. Tab finishes the name, or the part the matches share. ↑ and ↓ pick one, Enter goes there.",
-          "⌘K also takes a path starting with ~ or /, and lists open tabs and recent files.",
+          "Ctrl+K also takes a path starting with ~ or /, and lists open tabs and recent files.",
           "A name of a folder here opens it. Anything else runs as a command in your terminal, in this folder.",
           "Commands with spaces or special characters ask before running.",
           "code ., cursor ., zed ., warp . and similar open the app straight away.",
           "Terminals that can't take a command open in the folder, with the command on the clipboard to paste.",
         ],
-        tip: "The first time, macOS may ask to let Doftar control your terminal. Allow it.",
       },
     ],
   },
@@ -314,18 +302,18 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Images",
         points: [
           "Rotate, flip and crop. Save replaces the file. Save as copy writes “name (edited)” beside it.",
-          "Rotating or flipping a JPEG, HEIC or TIFF without cropping is lossless. Other edits save again, which costs JPEG and HEIC a little quality.",
-          "Photo details such as camera and location are kept.",
+          "Every edit saves the image again, which costs a JPEG a little quality.",
         ],
         limits: [
-          "Saves JPEG, PNG, TIFF, HEIC, BMP and GIF, but not animated or multi-page images.",
+          "Saves JPEG, PNG, TIFF, BMP and GIF, but not animated images. HEIC and HEIF can't be edited.",
+          "Photo details such as camera and location aren't kept in the saved image.",
           "A file changed by another app since you opened it isn't saved over.",
         ],
       },
       {
         title: "PDF, Markdown, video and audio",
         points: [
-          "PDFs: search, two pages side by side, thumbnails and passwords. Use Open in Preview to edit.",
+          "PDFs: search, two pages side by side, thumbnails and passwords. Use Open in default app to edit.",
           "Markdown: tables, footnotes, task lists and math. HTML in a document shows as text and never runs.",
           "Video plays MP4, M4V, MOV and WebM.",
           "Audio plays MP3, M4A, AAC, WAV, FLAC and AIFF, then the next track in the folder.",
@@ -383,11 +371,11 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Folder tree and Properties",
         points: [
-          "The folder tree (⌘⇧E) lists everything inside a folder with sizes, largest first. Its search opens the folders leading to each match.",
-          "Properties (⌘I) shows size, size on disk and everything a file says about itself. Checksums are calculated when you ask, with a box to check one you pasted.",
+          "The folder tree (Ctrl+Shift+E) lists everything inside a folder with sizes, largest first. Its search opens the folders leading to each match.",
+          "Properties (Ctrl+I) shows size, size on disk and everything a file says about itself. Checksums are calculated when you ask, with a box to check one you pasted.",
           "Folder sizes count hard links once, don't follow links, and stay on one drive.",
           "Up to 10 selected folders are measured for the status bar too, once the selection stops changing. It also shows the free space on the drive.",
-          "Right-click the list header to show Date created and Tags, or hide columns. Drag a header edge to resize. Double-click it to reset.",
+          "Right-click the list header to show Date created, or hide columns. Drag a header edge to resize. Double-click it to reset.",
           "View → Show/Hide Item Info puts each file's size under its name in the Icons view.",
         ],
         limits: ["The folder tree lists up to 400 items per folder.", "Properties for several items shows their size only."],
@@ -403,8 +391,7 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Git worktrees lists the linked worktrees the scan finds, with their repository, branch and size. Open the card to see uncommitted changes and commits that no other branch has.",
           "Move to Trash checks a worktree again first. If it has uncommitted changes, or commits on no branch, Doftar asks before it moves it.",
         ],
-        limits: ["A locked worktree can't be moved to the Trash. Unlock it with git worktree unlock first.", "Duplicates skip hidden items and the insides of apps. A copy made on the same APFS drive shares storage with the original, so removing it may free nothing."],
-        tip: "Give Doftar Full Disk Access in System Settings for a complete picture.",
+        limits: ["A locked worktree can't be moved to the Trash. Unlock it with git worktree unlock first.", "Duplicates skip hidden items. A copy made with reflinks (on Btrfs or XFS) shares storage with the original, so removing it may free nothing."],
       },
       {
         title: "Git",
@@ -414,14 +401,6 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Switching branch is the only change Doftar makes inside a repository. It refuses during a merge or rebase, with Git LFS, or if your changes would be overwritten.",
         ],
         limits: ["The history shows the last 200 commits.", "Repositories more than 7 folders deep, or in hidden folders, aren't listed."],
-      },
-      {
-        title: "Uninstalling apps",
-        points: [
-          "Doftar finds what an app left in your Library and lists it before anything is removed. You can remove the app alone.",
-          "The app and its leftovers move to the Trash, so you can undo an uninstall.",
-        ],
-        limits: ["An app the Trash refuses, such as one installed for all users, can only be deleted permanently. Doftar asks first, and macOS may ask for your password."],
       },
       {
         title: "Agent skills",
@@ -438,12 +417,10 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
       {
         title: "Cloud drives",
         points: [
-          "iCloud, Dropbox, Google Drive, OneDrive, Box and others are recognised. A mark shows whether a file is on this Mac or only online.",
-          "Opening or previewing an online-only file downloads it first.",
-          "Copying or moving online-only files to another place downloads them first, so the copy has the real content.",
+          "Dropbox, Google Drive, OneDrive, Box, MEGA and pCloud folders in your home folder are recognised by their names.",
           "Deleting in a cloud drive asks first, because it deletes on every device.",
         ],
-        limits: ["Cancel waits until the file that is downloading arrives."],
+        limits: ["Doftar can't tell which files are only online. Opening one is left to the sync app."],
       },
       {
         title: "Network and external drives",
@@ -452,13 +429,13 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
           "Eject drives from the sidebar. Doftar retries while a drive is busy.",
           "Thumbnails on external drives can be turned off in Settings → Privacy.",
         ],
-        limits: ["Changes made on a network drive from another computer show when you come back to the window, or press ⌘R."],
+        limits: ["Changes made on a network drive from another computer show when you come back to the window, or press Ctrl+R."],
       },
       {
         title: "Live refresh",
         points: [
           "The open folder updates by itself when its contents change, and again when you return to the window.",
-          "⌘R or F5 refreshes it by hand.",
+          "Ctrl+R or F5 refreshes it by hand.",
         ],
       },
     ],
@@ -470,10 +447,10 @@ export const HELP: { title: string; topics: HelpTopic[] }[] = [
         title: "Privacy and safety",
         points: [
           "Doftar makes no network connections: no update check, telemetry or crash reports. Check for updates opens the releases page in your browser.",
-          "Errors are kept in a log on your Mac. They leave it only if you use Help → Copy Diagnostic Info and paste them somewhere yourself.",
+          "Errors are kept in a log on your computer. They leave it only if you use Help → Copy Diagnostic Info and paste them somewhere yourself.",
           "Opening a script, installer or program always asks first.",
           "Documents, Markdown and notebooks can't run code.",
-          "macOS asks the first time Doftar opens Desktop, Documents, Downloads or a drive. After updating Doftar, you may need to allow it again in System Settings → Privacy & Security.",
+          "If the system denies Doftar access to a folder, it reports that instead of opening it.",
         ],
       },
       {

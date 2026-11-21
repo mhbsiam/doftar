@@ -676,7 +676,7 @@ function BaseIcon({ entry, size }: { entry: FileEntry; size: number }) {
   const isApp = entry.isDir && entry.ext === "app";
   // Options → Privacy can turn off previews of other volumes.
   const externalThumbs = useSettings((s) => s.externalThumbnails);
-  const allowed = externalThumbs || !entry.path.startsWith("/Volumes/");
+  const allowed = externalThumbs || !/^\/(media\/[^/]+|run\/media\/[^/]+\/[^/]+|mnt)\/[^/]+/.test(entry.path);
   const wanted =
     allowed &&
     (isApp ||

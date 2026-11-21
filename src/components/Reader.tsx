@@ -19,6 +19,7 @@ import { useViewerTheme } from "../hooks/useResolvedTheme";
 import { extOf, isDataFile, isSheet, isViewerImage } from "../util/kinds";
 import type { ReaderOpen } from "../types";
 import { readable } from "../util/readable";
+import { logUiError } from "../util/uiErrors";
 import { resolveHref, textOf } from "./MarkdownView";
 import { DocBody, dirOf, docClass, type Doc } from "./DocBody";
 import type { EditorControl } from "./TextEditor";
@@ -233,7 +234,10 @@ export function Reader() {
       .then((first) => {
         if (first) open(first.path, first.edit);
       })
-      .catch(() => {});
+      .catch((err) => {
+        // A dead ready command means the first document never lands here and the window sits blank. Say so in the log.
+        logUiError("reader ready", err);
+      });
     return () => void unOpen.then((f) => f());
   }, [go, guard]);
 
@@ -276,7 +280,7 @@ export function Reader() {
     });
     const unMenu = win.listen<string>("menu", ({ payload }) => {
       const path = currentRef.current;
-      // The menu bar takes the editor shortcuts (⌘Z, ⌘A, ⌘[) before the editor sees them.
+      // The menu bar takes the editor shortcuts (Ctrl+Z, Ctrl+A, Ctrl+[) before the editor sees them.
       if (editingRef.current && payload !== "close_tab") {
         editor.current?.command(payload);
         return;
@@ -427,7 +431,7 @@ export function Reader() {
           onClick={() => step(-1)}
           disabled={trail.at <= 0 || editing}
           aria-label="Back"
-          title="Back (⌘[)"
+          title="Back (Ctrl+[)"
         >
           <ArrowLeftRegular />
         </button>
@@ -436,7 +440,7 @@ export function Reader() {
           onClick={() => step(1)}
           disabled={trail.at >= trail.paths.length - 1 || editing}
           aria-label="Forward"
-          title="Forward (⌘])"
+          title="Forward (Ctrl+])"
         >
           <ArrowRightRegular />
         </button>
@@ -471,7 +475,7 @@ export function Reader() {
           <span className="iv-sep" />
           {editing ? (
             <>
-              <button className="iv-btn wide" onClick={() => void saveNow()} disabled={!dirty || saving} title="Save (⌘S)">
+              <button className="iv-btn wide" onClick={() => void saveNow()} disabled={!dirty || saving} title="Save (Ctrl+S)">
                 <SaveRegular />
                 <span>{saving ? "Saving…" : "Save"}</span>
               </button>

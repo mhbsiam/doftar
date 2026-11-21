@@ -19,7 +19,6 @@ import {
   duplicateSelection,
   openNewWindow,
 } from "../actions";
-import { api } from "../ipc";
 import { uncut, useClipboard } from "../stores/clipboard";
 import { closeSplit, focusPane, paneAt, paneStore, reopenClosedTab, usePanes, useTabs } from "../stores/tabs";
 import { useSettings } from "../stores/settings";
@@ -30,7 +29,11 @@ function isEditable(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  if (tag === "INPUT") {
+    const type = (el as HTMLInputElement).type;
+    return !["checkbox", "radio", "button", "submit", "reset", "file", "range", "color", "image"].includes(type);
+  }
+  return tag === "TEXTAREA" || el.isContentEditable;
 }
 
 export function useShortcuts() {
@@ -41,7 +44,6 @@ export function useShortcuts() {
       const active = tabs.tabs.find((t) => t.id === tabs.activeId);
 
       if (e.key === "Escape") {
-        void api.quicklookClose().catch(() => {});
         tabs.setRenaming(null);
         if (isEditable(e.target)) return;
         // Cancel a pending cut, as Explorer does. Only an Escape with nothing else to cancel leaves split view.
@@ -70,7 +72,7 @@ export function useShortcuts() {
         newFile();
         return;
       }
-      // Ctrl+Tab on both systems. ⌘⇧[ and ⌘⇧] as in browsers.
+      // Ctrl+Tab on both systems. Ctrl+Shift+[ and Ctrl+Shift+] as in browsers.
       if (e.ctrlKey && !e.metaKey && e.key === "Tab") {
         e.preventDefault();
         tabs.cycleTab(e.shiftKey ? -1 : 1);
@@ -87,7 +89,7 @@ export function useShortcuts() {
         return;
       }
 
-      if (e.metaKey && e.altKey && e.code === "KeyT") {
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.code === "KeyT") {
         e.preventDefault();
         openTerminalHere();
         return;
@@ -119,7 +121,7 @@ export function useShortcuts() {
             void (e.shiftKey ? redoLast() : undoLast());
             return;
           case "a":
-            // The menu bar owns ⌘⇧A (Applications) and ⌘⇧W (Close Window).
+            // The menu bar owns Ctrl+Shift+A (Applications) and Ctrl+Shift+W (Close Window).
             if (e.shiftKey) return;
             e.preventDefault();
             selectAll();
@@ -132,7 +134,7 @@ export function useShortcuts() {
             return;
           }
           case "k":
-            // ⌘K comes from the menu bar. Ctrl+K is the Windows-style key.
+            // Ctrl+K comes from the menu bar. Ctrl+K is the Windows-style key.
             if (!e.metaKey) {
               e.preventDefault();
               useUI.getState().setPaletteOpen(true);

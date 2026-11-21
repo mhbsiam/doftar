@@ -19,6 +19,10 @@ type ViewTransitionDocument = Document & {
 };
 
 const SETTLE_CAP_MS = 80;
+/** Long enough for the slowest fallback entrance (a closing tab: --dur-long plus its delay). */
+const FALLBACK_CLEAR_MS = 700;
+/** The global color cross-fade stand-in for the theme reveal. */
+const REVEAL_FADE_MS = 320;
 
 const pending: Job[] = [];
 let armed = false;
@@ -29,6 +33,14 @@ let live: Promise<void> = Promise.resolve();
 
 const reducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// WebKitGTK accepts startViewTransition but never runs the update callback, so
+// navigations and theme changes queued there would never apply; on some builds
+// the transition also crashes the web process and takes the window down. Rather
+// than lose the motion, runTransition falls back below: the arriving page slides
+// or fades in through the html.vt-fallback rules in global.css, and a theme
+// reveal becomes a short global color cross-fade.
+const VIEW_TRANSITIONS = false;
 
 export function notifySettled() {
   settle?.();
@@ -52,12 +64,16 @@ export function runTransition(
   pending.push({ kind, update, wait, after });
   if (armed) return live;
 
-  const doc = document as ViewTransitionDocument;
   // While the split halves move, a snapshot would draw the arriving page at rest,
   // apart from its pane. See setSplitAnimating in stores/tabs.ts.
-  if (!doc.startViewTransition || reducedMotion() || document.documentElement.classList.contains("split-animating")) {
-    drain();
-    return Promise.resolve();
+  const doc = document as ViewTransitionDocument;
+  if (
+    !VIEW_TRANSITIONS ||
+    !doc.startViewTransition ||
+    reducedMotion() ||
+    document.documentElement.classList.contains("split-animating")
+  ) {
+    return runFallback();
   }
 
   const root = document.documentElement;
@@ -102,6 +118,81 @@ export function runTransition(
     drain();
     return Promise.resolve();
   }
+}
+
+/**
+ * The no-view-transition path. Applies the queued updates in one flush, holds the
+ * returned promise until a waiting listing has settled (same contract as the view
+ * transition's `updateCallbackDone`), and lets the html.vt-fallback rules in
+ * global.css animate the arriving page.
+ */
+function runFallback(): Promise<void> {
+  const jobs = pending.splice(0);
+  if (jobs.length === 0) return Promise.resolve();
+  const root = document.documentElement;
+  const mine = ++token;
+  const kind = jobs[jobs.length - 1].kind;
+  const settled = jobs.some((j) => j.wait)
+    ? new Promise<void>((resolve) => {
+        settle = resolve;
+        setTimeout(resolve, SETTLE_CAP_MS);
+      })
+    : null;
+  // The reveal animates the change of theme itself, so the color transition must
+  // be armed before the new colors land, or there is no old state to move from.
+  if (kind === "reveal") armRevealFallback();
+  root.classList.add("vt-fallback");
+  root.dataset.vt = kind;
+  const clear = () =>
+    setTimeout(() => {
+      if (token !== mine) return;
+      root.classList.remove("vt-fallback");
+      delete root.dataset.vt;
+      delete root.dataset.vtPane;
+    }, FALLBACK_CLEAR_MS);
+  let changed = false;
+  try {
+    flushSync(() => {
+      for (const job of jobs) if (job.update() !== false) changed = true;
+    });
+    for (const job of jobs) job.after?.();
+  } catch (e) {
+    // A throwing update must not leave the markers on: every later navigation would
+    // replay the entrance animation until reload.
+    settle = null;
+    clear();
+    throw e;
+  }
+  const done = settled && changed ? settled : Promise.resolve();
+  return done.finally(() => {
+    settle = null;
+    // Leave the markers on until the entrance animation has played out, so a
+    // paint in between does not cut it short. A newer transition re-arms them.
+    clear();
+  });
+}
+
+/**
+ * The circle reveal spreads a snapshot of the new theme, which needs view
+ * transitions. Without them the theme change still animates: a short transition
+ * on the colors of every element cross-fades the whole window to the new look.
+ */
+function armRevealFallback() {
+  if (document.getElementById("vt-reveal-fallback")) return;
+  const style = document.createElement("style");
+  style.id = "vt-reveal-fallback";
+  style.textContent = `.vt-reveal-anim, .vt-reveal-anim *, .vt-reveal-anim *::before, .vt-reveal-anim *::after {
+    transition: background-color ${REVEAL_FADE_MS}ms var(--ease-out),
+      color ${REVEAL_FADE_MS}ms var(--ease-out),
+      border-color ${REVEAL_FADE_MS}ms var(--ease-out),
+      fill ${REVEAL_FADE_MS}ms var(--ease-out) !important;
+  }`;
+  document.head.appendChild(style);
+  document.documentElement.classList.add("vt-reveal-anim");
+  setTimeout(() => {
+    style.remove();
+    document.documentElement.classList.remove("vt-reveal-anim");
+  }, REVEAL_FADE_MS + 120);
 }
 
 /**

@@ -121,6 +121,8 @@ export interface SystemInfo {
   home: string;
   bootVolumeName: string;
   volumes: VolumeInfo[];
+  /** The real Trash folder, honoring `$XDG_DATA_HOME`. Null when it cannot be resolved. */
+  trashDir: string | null;
 }
 
 export type Location =
@@ -406,14 +408,6 @@ export interface Rect {
   y: number;
   w: number;
   h: number;
-}
-
-/** In CSS pixels from the window top-left. Anchors native popovers. */
-export interface ShareAnchor {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 export interface PortableTab {

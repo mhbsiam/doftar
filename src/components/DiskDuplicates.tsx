@@ -101,7 +101,7 @@ export function DiskDuplicates({ title, open }: { title: React.ReactNode; open: 
         <>
           <p className="disk-hint">
             {report.groups.length.toLocaleString()} sets{report.truncated ? " (the largest 500)" : ""}, up to{" "}
-            {formatSize(report.wasted)} taken by extra copies. A copy made in Finder or Doftar on this disk shares its
+            {formatSize(report.wasted)} taken by extra copies. A copy made with reflinks, like `cp --reflink`, shares its
             storage with the original, so removing it may free less than shown.
           </p>
           <ul className="disk-filelist">

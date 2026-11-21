@@ -32,7 +32,7 @@ import { clearPrefetch } from "./stores/prefetch";
 import { useUI } from "./stores/ui";
 import { currentTags, useTags, withTagAdded } from "./stores/tags";
 import { appName, currentEditors, currentTerminals, appCommand, type TerminalApp } from "./stores/terminals";
-import type { AppInfo, FileEntry, Location, OpResult, Progress, Resolutions, ShareAnchor, Step, Tag, TrashStep } from "./types";
+import type { AppInfo, FileEntry, Location, OpResult, Progress, Resolutions, Step, Tag, TrashStep } from "./types";
 import { extOf, isDataFile, isFolder, isMarkdown, isPlainText, isPlayableAudio, isPlayableVideo, isViewerImage } from "./util/kinds";
 import { formatSize, normalizePath } from "./util/format";
 import { shotListCsv } from "./util/shotList";
@@ -186,7 +186,8 @@ export function toggleSavedSearch(s: SavedSearch) {
 }
 
 export async function appsFor(path: string): Promise<AppInfo[]> {
-  const timeout = new Promise<AppInfo[]>((r) => setTimeout(() => r([]), 250));
+  // A stalled mount can hang the mime lookup; an empty menu beats no menu at all.
+  const timeout = new Promise<AppInfo[]>((r) => setTimeout(() => r([]), 2000));
   return Promise.race([api.openWithApps(path).catch(() => []), timeout]);
 }
 
@@ -208,9 +209,19 @@ export function openWith(paths: string[], app: string) {
   openWithConfirmed(paths, app).catch(showError);
 }
 
+/** Opens the in-app application chooser; resolves the chosen launcher, or null when cancelled. */
+export function pickAppDialog(): Promise<string | null> {
+  return new Promise((resolve) =>
+    useUI.getState().openAppPicker({
+      onPick: (path) => resolve(path),
+      onCancel: () => resolve(null),
+    })
+  );
+}
+
 export async function openWithOther(paths: string[]) {
   try {
-    const app = await api.pickApplication();
+    const app = await pickAppDialog();
     if (app) await openWithConfirmed(paths, app);
   } catch (err) {
     showError(err);
@@ -309,7 +320,7 @@ function confirmRun(path: string): Promise<boolean> {
 
 /** Resolves true if the file opened in a way that Recent should remember. */
 async function launch(path: string): Promise<boolean> {
-  if (extractsOnOpen(path)) {
+  if (await extractsOnOpen(path)) {
     await extractArchive(path);
     return false;
   }
@@ -356,6 +367,33 @@ export function openFile(path: string) {
       if (await launch(path)) useAppData.getState().addRecent(path);
     })
     .catch(showError);
+}
+
+/**
+ * Space previews one selected file in the built-in viewers — the Quick Look stand-in.
+ * Unlike `launch` it never extracts an archive, runs a program or hands a file to a
+ * foreign app: a type with no viewer simply does nothing. Several selected items do
+ * nothing either; the viewers show one file at a time.
+ */
+export function previewSelection() {
+  previewPaths(activeTab()?.selection ?? []);
+}
+
+export function previewPaths(paths: string[]) {
+  if (paths.length !== 1) return;
+  const path = paths[0];
+  const ext = extOf(path);
+  if (isViewerImage(ext)) return void openImageFromListing(path, viewerOrder(path));
+  if (isPlayableVideo(ext) || isPlayableAudio(ext)) return void openVideoFromListing(path);
+  if (ext === "pdf") return void openPdfFromListing(path);
+  if (isMarkdown(ext) || isDataFile(ext)) return void openReaderFromListing(path);
+  // A text extension can be a binary format too (.ts video), so the content decides.
+  void api
+    .isTextFile(path)
+    .catch(() => false)
+    .then((text) => {
+      if (text) openReaderFromListing(path);
+    });
 }
 
 /** Go to a typed absolute or `~` path: a folder opens, a file is shown in its folder. */
@@ -596,23 +634,27 @@ export async function pasteFromHistory(entry: ClipEntry) {
   if (dest) await transfer("copy", entry.paths, dest);
 }
 
-const VOLUME_TRASH = /^\/Volumes\/[^/]+\/\.Trashes\/\d+(?:\/|$)/;
+const VOLUME_TRASH = /^\/(media|mnt|run\/media)\/[^/]+\/[^/]*\/?\.Trash-\d+\/files(?:\/|$)/;
 
-export function openFullDiskAccessSettings() {
-  openUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles").catch(
-    showError
-  );
+/** freedesktop trash: $XDG_DATA_HOME/Trash/files, or ~/.local/share/Trash/files. */
+function trashDir(): string {
+  // The backend honors $XDG_DATA_HOME at runtime and reports the real folder in the
+  // system info. The computed default covers the brief window before that arrives.
+  const reported = useAppData.getState().trashDir;
+  if (reported) return reported;
+  const xdg = import.meta.env?.VITE_XDG_DATA_HOME as string | undefined;
+  return `${xdg && xdg.length > 0 ? xdg : `${useAppData.getState().home}/.local/share`}/Trash/files`;
 }
 
 export function isInTrash(path: string | null | undefined): boolean {
   if (!path) return false;
-  const trash = `${useAppData.getState().home}/.Trash`;
+  const trash = trashDir();
   return path === trash || path.startsWith(trash + "/") || VOLUME_TRASH.test(path);
 }
 
 export function isTrashDir(path: string | null | undefined): boolean {
   if (!path) return false;
-  if (path === `${useAppData.getState().home}/.Trash`) return true;
+  if (path === trashDir()) return true;
   const m = VOLUME_TRASH.exec(path);
   return m !== null && m[0].replace(/\/$/, "") === path;
 }
@@ -700,150 +742,20 @@ async function deleteChecked(paths: string[], ids?: (string | null)[]) {
   });
 }
 
-/** True for app bundles in an Applications folder, including subfolders. */
-export function isInstalledApp(entry: FileEntry): boolean {
-  return (
-    entry.isDir &&
-    entry.ext === "app" &&
-    /(^|\/)Applications(\/|$)/.test(parentOf(entry.path) ?? "")
-  );
-}
-
-const DENIED = /permission|not permitted|denied|operation not permitted|read-only/i;
-
-/**
- * Offers the related Library files too.
- */
-export async function uninstallApps(paths: string[]) {
-  const what = appLabel(paths);
-  const found = await Promise.all(paths.map((p) => api.appLeftovers(p).catch(() => [])));
-  const leftovers = [...new Map(found.flat().map((l) => [l.path, l])).values()];
-  const leftoverBytes = leftovers.reduce((n, l) => n + l.bytes, 0);
-  const base = `Are you sure you want to uninstall ${what}? ${paths.length === 1 ? "The app moves" : "The apps move"} to the Trash.`;
-  const listed = bulleted(leftovers.map((l) => l.path.replace(/^.*\/Library\//, "~/Library/")));
-  const asked = [...paths, ...leftovers.map((l) => l.path)];
-  const ids = confirmedIds(asked).then((ids) => ids && new Map(asked.map((p, i) => [p, ids[i]])));
-  useUI.getState().openConfirm({
-    title: "Uninstall?",
-    message:
-      leftovers.length > 0
-        ? `${base}\n\nIt also left ${leftovers.length} related item${leftovers.length === 1 ? "" : "s"} in your Library (${formatSize(leftoverBytes)}), which can go to the Trash too:\n${listed}`
-        : base,
-    confirmLabel: leftovers.length > 0 ? "Uninstall and remove leftovers" : "Uninstall",
-    danger: true,
-    alt:
-      leftovers.length > 0
-        ? { label: "Uninstall app only", onSelect: () => void ids.then((ids) => uninstallNow(paths, [], ids)) }
-        : undefined,
-    onConfirm: () =>
-      void ids.then((ids) => uninstallNow(paths, found.map((ls) => ls.map((l) => l.path)), ids)),
-  });
-}
-
-const appLabel = (apps: string[]) =>
-  apps.length === 1 ? `"${baseName(apps[0]).replace(/\.app$/, "")}"` : `${apps.length} apps`;
-
-/** The leftovers to remove once `remaining` stayed. No installed app may still claim one. */
-function leftoversToRemove(apps: string[], leftovers: string[][], remaining: string[]): string[] {
-  const kept = new Set(apps.flatMap((p, i) => (remaining.includes(p) ? (leftovers[i] ?? []) : [])));
-  return [...new Set(leftovers.flat())].filter((l) => !kept.has(l));
-}
-
-/**
- * Moves the apps to the Trash and their leftovers after them. Only an app the Trash took flies there.
- * Permanent deletion is offered for one it refused. `leftovers[i]` belong to `apps[i]`. `ids` come from `confirmedIds`.
- */
-async function uninstallNow(apps: string[], leftovers: string[][], ids?: Map<string, string | null>) {
-  try {
-    const res = await api.trashPaths(apps);
-    const gone = trashedFrom(apps, res);
-    const remaining = apps.filter((p) => !gone.includes(p));
-    if (gone.length > 0) flyTo(gone, { kind: "trash" });
-    dropGone(gone);
-    const away = leftoversToRemove(apps, leftovers, remaining);
-    // shortcut: a leftover on a volume with no Trash stays where it is. Offer deletion if home folders on shares matter.
-    const left = away.length > 0 ? await api.trashPaths(away) : null;
-    if (left) reportErrors(left.errors, "Some leftovers couldn't be removed: ");
-    if (gone.length > 0) {
-      const steps = [...res.inverse, ...(left?.inverse ?? [])];
-      useAppData.getState().recordTrashOrigins(
-        steps.flatMap((s) => (s.kind === "move" ? [{ trashed: s.from, origin: s.to, id: s.id }] : []))
-      );
-      const entry = useHistory.getState().record("Uninstall", steps);
-      useUI.getState().pushToast(`Uninstalled ${appLabel(gone)}`, {
-        label: "Undo",
-        onClick: () => undoEntry(entry),
-      });
-    }
-    if (remaining.length > 0 && (res.noTrash?.length || res.errors.some((e) => DENIED.test(e)))) {
-      useUI.getState().openConfirm({
-        title: "Delete permanently?",
-        message: `${appLabel(remaining)} can't be moved to the Trash. Delete permanently instead? macOS may ask for your password. This can't be undone.`,
-        confirmLabel: "Delete",
-        danger: true,
-        onConfirm: () =>
-          void deleteAppsNow(remaining, remaining.map((p) => leftovers[apps.indexOf(p)] ?? []), ids),
-      });
-    } else {
-      reportErrors(res.errors);
-    }
-  } catch (err) {
-    showError(err);
-  } finally {
-    refreshSoon();
-  }
-}
-
-/** For apps the Trash refused. One that needs administrator rights is removed after macOS asks the user to authenticate. */
-async function deleteAppsNow(apps: string[], leftovers: string[][], ids?: Map<string, string | null>) {
-  const idsOf = (paths: string[]) => ids && paths.map((p) => ids.get(p) ?? null);
-  const what = appLabel(apps);
-  try {
-    const res = await runJob(`Uninstalling ${what}`, (id, on) => api.deletePermanently(apps, id, on, idsOf(apps)));
-    let exists = await Promise.all(apps.map((p) => api.pathExists(p).catch(() => true)));
-    let remaining = apps.filter((_, i) => exists[i]);
-    if (remaining.length > 0 && !res.cancelled && res.errors.some((e) => DENIED.test(e))) {
-      try {
-        await api.deleteAppsWithAdmin(remaining);
-      } catch (err) {
-        if (String(err) !== "cancelled") showError(err);
-      }
-      exists = await Promise.all(remaining.map((p) => api.pathExists(p).catch(() => true)));
-      remaining = remaining.filter((_, i) => exists[i]);
-    } else {
-      reportErrors(res.errors);
-    }
-    const removed = apps.filter((p) => !remaining.includes(p));
-    if (removed.length > 0) useHistory.getState().logOnly("Uninstall", removed);
-    dropGone(removed);
-    void reflectPaths(removed);
-    const gone = leftoversToRemove(apps, leftovers, remaining);
-    if (gone.length > 0) {
-      const left = await runJob("Removing leftover files", (id, on) =>
-        api.deletePermanently(gone, id, on, idsOf(gone))
-      );
-      reportErrors(left.errors, "Some leftovers couldn't be removed: ");
-    }
-    if (removed.length > 0) {
-      useUI.getState().pushToast(`Uninstalled ${appLabel(removed)}`);
-    }
-  } catch (err) {
-    showError(err);
-  } finally {
-    refreshSoon();
-  }
-}
-
 // Formats macOS tools open. See TAR_SUFFIXES in archive.rs.
 const EXTRACTABLE = /\.(zip|tar|tgz|tbz2|txz|tar\.(gz|bz2|xz)|7z|rar|iso|cab|xar|cpio|lzh|lha)$/i;
 
-export function isExtractable(entry: FileEntry): boolean {
-  return !entry.isDir && EXTRACTABLE.test(entry.name);
+export async function isExtractable(entry: FileEntry): Promise<boolean> {
+  if (entry.isDir || !EXTRACTABLE.test(entry.name)) return false;
+  // The real check is which tools exist on this machine.
+  return api.archiveExtractable(entry.name).catch(() => false);
 }
 
 /** Opening these extracts in place, like Extract Here, not in Archive Utility. Disk images still open in macOS, which mounts them. */
-function extractsOnOpen(path: string): boolean {
-  return EXTRACTABLE.test(path) && !/\.iso$/i.test(path);
+function extractsOnOpen(path: string): Promise<boolean> {
+  return (
+    EXTRACTABLE.test(path) && !/\.iso$/i.test(path) ? api.archiveExtractable(baseName(path)) : Promise.resolve(false)
+  ).catch(() => false);
 }
 
 function describe(paths: string[]): string {
@@ -919,13 +831,13 @@ export async function exportShotList() {
   }
 }
 
-export function extractSelection() {
+export async function extractSelection() {
   const tab = activeTab();
   if (!tab) return;
   const chosen = new Set(tab.selection);
-  getViewEntries()
-    .filter((e) => chosen.has(e.path) && isExtractable(e))
-    .forEach((e) => void extractArchive(e.path));
+  const entries = getViewEntries().filter((e) => chosen.has(e.path));
+  const ok = await Promise.all(entries.map(isExtractable));
+  entries.filter((_, i) => ok[i]).forEach((e) => void extractArchive(e.path));
 }
 
 /** `ids` come from `confirmedIds`. An item replaced since the confirm is kept. */
@@ -940,7 +852,10 @@ export async function deleteNow(paths: string[], ids?: (string | null)[]) {
     // Forget favorites and recents only for paths that are gone.
     const exists = await Promise.all(paths.map((p) => api.pathExists(p).catch(() => true)));
     const removed = paths.filter((_, i) => !exists[i]);
-    if (removed.length > 0) useHistory.getState().logOnly("Delete Immediately", removed);
+    if (removed.length > 0) {
+      useHistory.getState().logOnly("Delete Immediately", removed);
+      useClipboard.getState().forget(removed);
+    }
     dropGone(removed);
     if (res.cancelled) {
       useUI.getState().pushToast("Delete cancelled");
@@ -991,6 +906,7 @@ export function trashNow(paths: string[], { fly = true } = {}): Promise<void> {
       // Reset the early hide, then hide only the gone paths. A reload during the trash may have dropped the early hide.
       // Items that stayed after an error come back.
       useOptimistic.getState().revert(hidden);
+      if (gone.length) useClipboard.getState().forget(gone);
       dropGone(gone);
       refreshSoon();
       reportErrors(res.errors);
@@ -1116,8 +1032,8 @@ export async function putBack(paths: string[]) {
       const what = unknown.length === 1 ? `"${baseName(unknown[0])}" came` : `${unknown.length} items came`;
       const reveal = await askConfirm({
         title: "Original location unknown",
-        message: `Doftar doesn't know where ${what} from. Finder's Put Back may still be able to restore ${unknown.length === 1 ? "it" : "them"}.`,
-        confirmLabel: "Reveal in Finder",
+        message: `Doftar doesn't know where ${what} from. Showing ${unknown.length === 1 ? "it" : "them"} in the Trash instead.`,
+        confirmLabel: "Reveal in File Manager",
       });
       if (reveal) revealInFinder(unknown);
     }
@@ -1448,15 +1364,6 @@ export function newFile() {
     .catch(showError);
 }
 
-export function quickLookPaths(paths: string[]) {
-  if (paths.length === 0) return;
-  api.quicklook(paths).catch(() => {});
-}
-
-export function quickLookSelection() {
-  quickLookPaths(activeTab()?.selection ?? []);
-}
-
 export function selectAll() {
   useTabs.getState().setSelection(getViewEntries().map((e) => e.path), null);
 }
@@ -1585,7 +1492,7 @@ const liveTabs = (tabs: { id: number }[]) => tabs.filter((t) => !isTabClosing(t.
 
 /**
  * Removes tab `id` after another window takes it. A window with no tabs goes away:
- * a tab window closes, and the main window hides, as with ⌘⇧W.
+ * a tab window closes, and the main window hides, as with Ctrl+Shift+W.
  */
 export function releaseMovedTab(id: number) {
   const found = findTab(id);
@@ -1594,15 +1501,6 @@ export function releaseMovedTab(id: number) {
   found.store.closeTab(id, true);
   const win = getCurrentWindow();
   if (alone && win.label === "main") void win.hide();
-}
-
-export function shareItems(paths: string[], anchor: ShareAnchor | Element) {
-  if (paths.length === 0) return;
-  const rect =
-    anchor instanceof Element
-      ? (({ x, y, width, height }) => ({ x, y, width, height }))(anchor.getBoundingClientRect())
-      : anchor;
-  api.sharePaths(paths, rect).catch(showError);
 }
 
 export async function copyAsPath(paths?: string[]): Promise<boolean> {
@@ -1621,7 +1519,18 @@ export function diagnosticsCopied() {
 }
 
 export function copyDiagnostics() {
-  api.copyDiagnostics().then(diagnosticsCopied).catch(showError);
+  // On Linux the command hands the report back for the page to copy; on macOS it
+  // wrote the pasteboard itself and returns "".
+  api
+    .copyDiagnostics()
+    .then((text) => {
+      if (!text) return diagnosticsCopied();
+      void navigator.clipboard
+        .writeText(text)
+        .then(diagnosticsCopied)
+        .catch(() => useUI.getState().pushToast("Couldn't copy diagnostic info", undefined, "error"));
+    })
+    .catch(showError);
 }
 
 export function propertiesForSelection() {
@@ -1696,7 +1605,7 @@ function runNow(dir: string, command: string) {
 }
 
 export async function openInOtherTerminal(path: string) {
-  const app = await api.pickApplication().catch(() => null);
+  const app = await pickAppDialog();
   if (!app) return;
   const s = useSettings.getState();
   if (!currentTerminals().list.some((t) => t.path === app)) {
@@ -1716,7 +1625,7 @@ export function openInEditor(path: string, app?: TerminalApp) {
 }
 
 export async function openInOtherEditor(path: string) {
-  const app = await api.pickApplication().catch(() => null);
+  const app = await pickAppDialog();
   if (!app) return;
   const s = useSettings.getState();
   if (!currentEditors().list.some((t) => t.path === app)) {
@@ -1725,7 +1634,7 @@ export async function openInOtherEditor(path: string) {
   openInEditor(path, { name: appName(app), path: app });
 }
 
-/** ⌥⌘T. Uses the one selected folder, else the open folder, else home. */
+/** Ctrl+Alt+T. Uses the one selected folder, else the open folder, else home. */
 export function openTerminalHere() {
   const tab = activeTab();
   if (!tab) return;

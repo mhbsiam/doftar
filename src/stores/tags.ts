@@ -5,8 +5,8 @@ import { sameTags } from "../util/tags";
 import type { FileEntry, Tag } from "../types";
 
 /**
- * Tags fresher than the listing's. A listing reads tags only for items with a Finder label
- * (see `tags::read_labelled`). A scan adds the other tags. Views use `withTags`.
+ * Tags fresher than the listing's. A listing reads each item's tags once; a scan re-reads
+ * them as a group under the freshness rules below. Views use `withTags`.
  */
 interface TagStore {
   byPath: Map<string, Tag[]>;
@@ -129,3 +129,4 @@ export function useTagScan(
     };
   }, [entries, scan, refresh]);
 }
+

@@ -7,6 +7,7 @@ import { useDrag } from "./stores/drag";
 import { useUI } from "./stores/ui";
 import { confirmTrash, getViewEntries, showError, transfer, trashNow } from "./actions";
 import { absorb } from "./flight";
+import { ON_LINUX } from "./util/platform";
 import type { FileEntry } from "./types";
 
 const THRESHOLD = 4;
@@ -197,7 +198,7 @@ export function dropOn(spec: DropSpec, paths: string[], copy: boolean) {
     const what = items.length === 1 ? `"${baseName(items[0])}"` : `${items.length} items`;
     useUI.getState().openConfirm({
       title: `Move ${what} into "${baseName(spec.path) || "/"}"?`,
-      message: "Hold Option while dragging to copy instead.",
+      message: `Hold ${ON_LINUX ? "Alt" : "Option"} while dragging to copy instead.`,
       confirmLabel: "Move",
       onConfirm: go,
     });

@@ -438,9 +438,10 @@ export function DiskView() {
       const next = new Set(cur);
       const f = files[index];
       if (shift && lastIndex.current !== null) {
-        const [a, b] = [lastIndex.current, index].sort((x, y) => x - y);
+        const last = Math.min(lastIndex.current, files.length - 1);
+        const [a, b] = [last, index].sort((x, y) => x - y);
         const on = !cur.has(f.path);
-        for (let i = a; i <= b; i++) {
+        for (let i = a; i <= b && i < files.length; i++) {
           if (on) next.add(files[i].path);
           else next.delete(files[i].path);
         }

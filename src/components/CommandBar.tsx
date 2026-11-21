@@ -22,7 +22,6 @@ import {
   CutRegular,
   DeleteRegular,
   EditRegular,
-  ShareIosRegular,
   ArrowUpRegular,
   DocumentRegular,
   FilterRegular,
@@ -76,7 +75,6 @@ import {
   pasteFromHistory,
   staleByEntry,
   undoFromLog,
-  shareItems,
   startRename,
   togglePreview,
 } from "../actions";
@@ -133,12 +131,12 @@ function PreviewToggle() {
   const label = open ? "Hide preview" : "Show preview";
   const Icon = open ? PanelRightContractRegular : PanelRightExpandRegular;
   return (
-    <Tooltip content={`${label} (⇧⌘P)`} relationship="label">
+    <Tooltip content={`${label} (Ctrl+Shift+P)`} relationship="label">
       <button
         className="cmd horizontal compact"
         aria-label="Preview"
         aria-pressed={open}
-        aria-keyshortcuts="Meta+Shift+P"
+        aria-keyshortcuts="Control+Shift+P"
         onClick={() => togglePreview()}
       >
         <Icon />
@@ -149,11 +147,11 @@ function PreviewToggle() {
 
 function PaletteButton() {
   return (
-    <Tooltip content="Command palette (⌘K)" relationship="label">
+    <Tooltip content="Command palette (Ctrl+K)" relationship="label">
       <button
         className="cmd horizontal compact"
         aria-label="Command palette"
-        aria-keyshortcuts="Meta+K"
+        aria-keyshortcuts="Control+K"
         onClick={() => useUI.getState().setPaletteOpen(true)}
       >
         <KeyCommandRegular />
@@ -164,11 +162,11 @@ function PaletteButton() {
 
 function PatternButton() {
   return (
-    <Tooltip content="Select by pattern (⇧⌘S)" relationship="label">
+    <Tooltip content="Select by pattern (Ctrl+Shift+S)" relationship="label">
       <button
         className="cmd horizontal compact pattern-btn"
         aria-label="Select by pattern"
-        aria-keyshortcuts="Meta+Shift+S"
+        aria-keyshortcuts="Control+Shift+S"
         onClick={() => useUI.getState().setSelectPatternOpen(true)}
       >
         <TextAsteriskRegular />
@@ -271,11 +269,11 @@ function ActivityButton({ inFolder }: { inFolder: boolean }) {
   return (
     <Menu open={open && enabled} onOpenChange={(_, d) => setOpen(d.open)}>
       <MenuTrigger disableButtonEnhancement>
-        <Tooltip content="Activity (⌘⇧V)" relationship="label">
+        <Tooltip content="Activity (Ctrl+Shift+V)" relationship="label">
           <button
             className="cmd horizontal compact"
             aria-label="Activity"
-            aria-keyshortcuts="Meta+Shift+V"
+            aria-keyshortcuts="Control+Shift+V"
             disabled={!enabled}
           >
             <ClipboardClockRegular />
@@ -765,12 +763,6 @@ export function CommandBar() {
         onClick={() => toggleSplit()}
       />
       <CmdDivider />
-      <CmdButton
-        label="Share"
-        icon={<ShareIosRegular />}
-        disabled={!hasSelection}
-        onClick={(e) => shareItems(tab.selection, e.currentTarget)}
-      />
       <CmdButton
         className="fold-first"
         label="Compare"

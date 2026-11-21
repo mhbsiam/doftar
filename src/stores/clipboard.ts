@@ -65,7 +65,26 @@ export const useClipboard = create<ClipboardStore>((set, get) => ({
     }
   },
   clear: () => set({ op: null, paths: [], cutAt: null }),
-  forget: (paths) => set((s) => ({ history: s.history.filter((e) => !sameFiles(e.paths, paths)) })),
+  forget: (paths) => {
+    const gone = new Set(paths);
+    set((s) => {
+      const keep = (ps: string[]) => ps.filter((p) => !gone.has(p));
+      const history = s.history
+        .map((e) => ({ ...e, paths: keep(e.paths) }))
+        .filter((e) => e.paths.length > 0);
+      const rest = keep(s.paths);
+      const op = rest.length > 0 ? s.op : null;
+      return { history, paths: rest, op, cutAt: op === "cut" ? s.cutAt : null };
+    });
+    const { paths: rest, op } = get();
+    if (rest.length) {
+      void api.clipboardWriteFiles(rest).then((cc) =>
+        useClipboard.setState({ changeCount: cc, cutAt: op === "cut" ? cc : null })
+      );
+    } else {
+      void api.clipboardClear().catch(() => {});
+    }
+  },
   clearHistory: () => set({ history: [] }),
 }));
 

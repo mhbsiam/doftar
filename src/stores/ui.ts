@@ -46,6 +46,11 @@ export interface ConfirmSpec {
   onCancel?: () => void;
 }
 
+export interface AppPickerSpec {
+  onPick: (path: string) => void;
+  onCancel: () => void;
+}
+
 export interface ConflictSpec {
   conflicts: Conflict[];
   resolve: (resolutions: Resolutions | null) => void;
@@ -75,6 +80,7 @@ interface UIStore {
   pushToast: (message: string, action?: ToastAction, tone?: Toast["tone"]) => void;
   dismissToast: (id: number) => void;
   confirm: ConfirmSpec | null;
+  appPicker: AppPickerSpec | null;
   conflictSpec: ConflictSpec | null;
   properties: FileEntry[] | null;
   newTagFor: FileEntry[] | null;
@@ -95,6 +101,8 @@ interface UIStore {
   dragOver: number | null;
   openConfirm: (spec: ConfirmSpec) => void;
   closeConfirm: () => void;
+  openAppPicker: (spec: AppPickerSpec) => void;
+  closeAppPicker: () => void;
   openConflicts: (spec: Omit<ConflictSpec, "id">) => void;
   closeConflicts: () => void;
   openProperties: (entries: FileEntry | FileEntry[]) => void;
@@ -120,6 +128,7 @@ interface UIStore {
 
 export type ActiveModal =
   | "confirm"
+  | "appPicker"
   | "conflicts"
   | "properties"
   | "newTag"
@@ -130,10 +139,12 @@ export type ActiveModal =
   | "settings"
   | "help"
   | "palette"
-  | "menu";
+  | "menu"
+  | "clipHistory";
 
 export function activeModal(s: UIStore = useUI.getState()): ActiveModal | null {
   if (s.confirm) return "confirm";
+  if (s.appPicker) return "appPicker";
   if (s.conflictSpec) return "conflicts";
   if (s.properties) return "properties";
   if (s.newTagFor) return "newTag";
@@ -144,6 +155,7 @@ export function activeModal(s: UIStore = useUI.getState()): ActiveModal | null {
   if (s.settingsOpen) return "settings";
   if (s.helpOpen) return "help";
   if (s.paletteOpen) return "palette";
+  if (s.clipHistoryOpen) return "clipHistory";
   if (s.contextMenu) return "menu";
   return null;
 }
@@ -160,6 +172,7 @@ export const useUI = create<UIStore>((set) => ({
   dismissToast: (id) =>
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   confirm: null,
+  appPicker: null,
   conflictSpec: null,
   properties: null,
   newTagFor: null,
@@ -181,6 +194,13 @@ export const useUI = create<UIStore>((set) => ({
       return { confirm: spec };
     }),
   closeConfirm: () => set({ confirm: null }),
+  openAppPicker: (spec) =>
+    set((s) => {
+      // Do not leave the caller of a replaced picker waiting.
+      s.appPicker?.onCancel();
+      return { appPicker: spec };
+    }),
+  closeAppPicker: () => set({ appPicker: null }),
   openConflicts: (spec) =>
     set((s) => {
       // Only one transfer resolves conflicts. A new one cancels the old one, so its promise does not hang.

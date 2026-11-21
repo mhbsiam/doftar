@@ -32,10 +32,10 @@ import {
   PersonRegular,
   ScreenshotFilled,
   ScreenshotRegular,
-  DiamondFilled,
-  DiamondRegular,
   TagFilled,
   TagRegular,
+  DiamondFilled,
+  DiamondRegular,
   VideoClipFilled,
   VideoClipRegular,
   SearchFilled,
@@ -299,7 +299,8 @@ export function NavPane() {
       .catch(() => {});
   }, []);
   const savedSearches = useSettings((s) => s.savedSearches);
-  const trashPath = home ? `${home}/.Trash` : null;
+  // The real Trash, honoring $XDG_DATA_HOME, as reported by the backend's system info.
+  const trashPath = useAppData((s) => s.trashDir);
   const trashBytes = useTrashSize(trashPath);
   const trashColor = useFolderColor(trashPath ?? undefined);
   const volumes: VolumeInfo[] = (info?.volumes ?? []).filter(
@@ -518,11 +519,11 @@ export function NavPane() {
       <NavRow
         label="Apps"
         icon={<AppsIcon />}
-        selected={activePath === "/Applications"}
-        onClick={() => navigateTo({ kind: "path", path: "/Applications" })}
-        title="/Applications"
-        drop="path:/Applications"
-        menu={() => placeMenu(() => navigateTo({ kind: "path", path: "/Applications" }))}
+        selected={activePath === "/usr/share/applications"}
+        onClick={() => navigateTo({ kind: "path", path: "/usr/share/applications" })}
+        title="/usr/share/applications"
+        drop="path:/usr/share/applications"
+        menu={() => placeMenu(() => navigateTo({ kind: "path", path: "/usr/share/applications" }))}
       />
       {PAGES.filter((p) => !TOOL_PAGES.includes(p.kind) && !hiddenPlaces.includes(p.kind)).map((p) => (
         <NavRow
@@ -543,19 +544,21 @@ export function NavPane() {
             colorId={trashColor}
           />
         }
-        selected={activePath === `${home}/.Trash`}
-        onClick={() => navigateTo({ kind: "path", path: `${home}/.Trash` })}
+        selected={activePath === trashPath}
+        onClick={() => trashPath !== null && navigateTo({ kind: "path", path: trashPath })}
         title={
-          trashBytes === null
-            ? `${home}/.Trash`
-            : `Trash · ${formatSize(trashBytes)}`
+          trashPath === null
+            ? undefined
+            : trashBytes === null
+              ? trashPath
+              : `Trash · ${formatSize(trashBytes)}`
         }
         drop="trash"
         menu={() => [
           {
             key: "open",
             label: "Open",
-            onSelect: () => navigateTo({ kind: "path", path: `${home}/.Trash` }),
+            onSelect: () => trashPath !== null && navigateTo({ kind: "path", path: trashPath }),
           },
           { key: "empty", label: "Empty Trash", dividerBefore: true, onSelect: emptyTrash },
         ]}

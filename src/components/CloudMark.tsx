@@ -29,7 +29,7 @@ export function CloudMark({ entry }: { entry: FileEntry }) {
       </span>
     );
   }
-  const title = entry.isDataless ? "Online only: downloads when opened" : "Downloaded to this Mac";
+  const title = entry.isDataless ? "Online only: downloads when opened" : "Downloaded to this device";
   return (
     <span className={`cloud-mark ${entry.isDataless ? "online" : "local"}`} title={title} role="img" aria-label={title}>
       {entry.isDataless ? <CloudRegular /> : <CheckmarkCircleFilled />}

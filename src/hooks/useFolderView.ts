@@ -24,7 +24,7 @@ const pick = (s: ViewPrefs): ViewPrefs => ({
 });
 
 /** The Apps page is always sorted by name, ascending, and never grouped. */
-const APPS_PAGE = "/Applications";
+const APPS_PAGE = "/usr/share/applications";
 
 /** These places start with their own view. The user's own choices there win. */
 const DOWNLOADS_VIEW: Partial<ViewPrefs> = { groupBy: "created", sortKey: "modified", sortAsc: true };

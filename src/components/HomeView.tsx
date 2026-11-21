@@ -23,8 +23,7 @@ import {
   navigateTo,
   activateEntry,
   openFile as openFileAt,
-  quickLookPaths,
-  shareItems,
+  previewPaths,
   revealInFinder,
 } from "../actions";
 import { formatDate, basename } from "../util/format";
@@ -72,6 +71,9 @@ function folderTotals(path: string, onProgress: (p: SizeProgress) => void): Prom
         sizeJobs.delete(path);
         return p;
       });
+    // A rejected probe must leave the map at once, or every later tile re-awaits the
+    // same dead promise and never retries (the denied result deliberately does).
+    void job.catch(() => sizeJobs.delete(path));
     sizeJobs.set(path, job);
   }
   return job;
@@ -93,7 +95,7 @@ function useQuickFolderTotals(path: string): SizeProgress | null {
 
 function totalsLabel(t: SizeProgress | null, fallback: string): string {
   if (!t) return fallback;
-  if (t.denied) return "No access · allow Doftar in Privacy & Security";
+  if (t.denied) return "No access to this folder";
   const items = t.files + t.folders;
   const n = `${items.toLocaleString()} item${items === 1 ? "" : "s"}`;
   return `${n} · ${formatSize(t.bytes)}${t.done ? "" : "…"}`;
@@ -156,7 +158,7 @@ function activate(entry: FileEntry) {
   else activateEntry(entry);
 }
 
-function homeMenu(entry: FileEntry, kind: "fav" | "recent", x: number, y: number): MenuItemSpec[] {
+function homeMenu(entry: FileEntry, kind: "fav" | "recent"): MenuItemSpec[] {
   const appdata = useAppData.getState();
   const ui = useUI.getState();
   return [
@@ -166,7 +168,7 @@ function homeMenu(entry: FileEntry, kind: "fav" | "recent", x: number, y: number
       label: "Open file location",
       onSelect: () => useTabs.getState().reveal(entry.path),
     },
-    { key: "finder", label: "Reveal in Finder", onSelect: () => revealInFinder([entry.path]) },
+    { key: "finder", label: "Reveal in File Manager", onSelect: () => revealInFinder([entry.path]) },
     {
       key: "remove",
       label: kind === "fav" ? "Remove from Favorites" : "Remove from Recent",
@@ -184,7 +186,6 @@ function homeMenu(entry: FileEntry, kind: "fav" | "recent", x: number, y: number
       },
     },
     { key: "d", dividerBefore: true },
-    { key: "share", label: "Share", onSelect: () => shareItems([entry.path], { x, y, width: 1, height: 1 }) },
     { key: "copy-path", label: "Copy as path", onSelect: () => copyAsPath([entry.path]) },
     { key: "props", label: "Properties", onSelect: () => ui.openProperties(entry) },
   ];
@@ -219,11 +220,12 @@ function InfoRow(props: {
         } else if (e.key === " ") {
           e.preventDefault();
           onSelect(entry.path);
-          if (!e.repeat) quickLookPaths([entry.path]);
+          // Select, then preview in the built-in viewer, as the folder listing does.
+          if (!entry.isDir) previewPaths([entry.path]);
         } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
           e.preventDefault();
           const r = e.currentTarget.getBoundingClientRect();
-          useUI.getState().openContextMenu(r.left + 32, r.bottom, homeMenu(entry, kind, r.left + 32, r.bottom));
+          useUI.getState().openContextMenu(r.left + 32, r.bottom, homeMenu(entry, kind));
         }
       }}
     >
@@ -323,7 +325,7 @@ export function HomeView() {
     kind: "fav" | "recent"
   ) => {
     e.preventDefault();
-    ui.openContextMenu(e.clientX, e.clientY, homeMenu(entry, kind, e.clientX, e.clientY));
+    ui.openContextMenu(e.clientX, e.clientY, homeMenu(entry, kind));
   };
 
   return (

@@ -2,17 +2,28 @@ import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { PhysicalSize } from "@tauri-apps/api/dpi";
 import { invoke } from "@tauri-apps/api/core";
+import { ON_LINUX } from "../util/platform";
 
 export const ZOOM_EVENT = "wf:zoom";
 
 // Resolve it once. Then the resize subscription stays across renders.
 const win = getCurrentWindow();
 
+// On Linux the window manager draws the window buttons (the component below renders
+// nothing), but the Window menu's Zoom still goes through the app's frame toggle.
+if (ON_LINUX) {
+  window.addEventListener(ZOOM_EVENT, () => {
+    void invoke<boolean>("toggle_maximize_window").catch(() => {});
+  });
+}
+
 /** Every window draws these in place of the native buttons. Kept apart from the file manager stores for the viewer windows. */
 export function CaptionButtons() {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
+    // Linux already has the window manager's own buttons; drawing a second pair duplicates them.
+    if (ON_LINUX) return;
     // The bar moves between halves when split view changes. Catch up on mount.
     void win.isMaximized().then(setMaximized).catch(() => {});
     let nudgedFor = "";
@@ -44,10 +55,15 @@ export function CaptionButtons() {
       .catch(() => {});
 
   useEffect(() => {
+    // The module listener above owns Zoom on Linux; two would maximize and un-maximize.
+    if (ON_LINUX) return;
     const onZoom = () => toggleMaximize();
     window.addEventListener(ZOOM_EVENT, onZoom);
     return () => window.removeEventListener(ZOOM_EVENT, onZoom);
   }, []);
+
+  // Linux already has the window manager's own buttons; drawing a second pair duplicates them.
+  if (ON_LINUX) return null;
 
   // Both styles render and data-window-buttons (see main.tsx) hides one: viewer windows do not mirror the settings store.
   // macOS traffic lights: grey while the window is in the background (see data-inactive in main.tsx).

@@ -112,7 +112,8 @@ export const useSettings = create<SettingsStore>()(
     (set, get) => ({
       theme: "system",
       textScale: 1,
-      windowButtons: "macos",
+      // This tree targets Linux, where the window controls sit on the right.
+      windowButtons: "windows",
       folderColor: "teal",
       selectionColor: null,
       folderColors: {},
