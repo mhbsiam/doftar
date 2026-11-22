@@ -1,7 +1,5 @@
 //! The macOS share menu for files.
 
-use std::path::Path;
-
 /// Where to point the picker: a rect in CSS pixels from the webview top-left corner.
 #[derive(serde::Deserialize, Clone, Copy, Debug)]
 pub struct Anchor {
@@ -66,7 +64,7 @@ pub fn share_paths(
 ) -> Result<(), String> {
     let paths: Vec<String> = paths
         .into_iter()
-        .filter(|p| p.starts_with('/') && Path::new(p).exists())
+        .filter(|p| p.starts_with('/') && crate::paths::real(p).exists())
         .collect();
     if paths.is_empty() {
         return Err("nothing to share".into());

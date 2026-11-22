@@ -9,6 +9,7 @@ import { applyMotionScale } from "./util/motion";
 import { startUiErrorLog } from "./util/uiErrors";
 import { PaneBoundary } from "./components/PaneBoundary";
 import { CaptionButtons } from "./components/CaptionButtons";
+import { ON_LINUX } from "./util/platform";
 import "./global.css";
 
 startUiErrorLog();
@@ -22,6 +23,8 @@ const PDF_LABEL = "pdf";
 /** Must match `LABEL` in video.rs. */
 const VIDEO_LABEL = "video";
 
+// Styles that differ on Linux key off this. See global.css.
+if (ON_LINUX) document.documentElement.dataset.os = "linux";
 applyTextScale(useSettings.getState().textScale);
 void applyMotionScale();
 // Registered custom properties let the spring-loading ring sweep. Without them it shows whole.

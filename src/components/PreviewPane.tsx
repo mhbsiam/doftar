@@ -22,6 +22,9 @@ import { basename, formatDate, formatSize } from "../util/format";
 import { fileKind, isPlayableVideo, typeLabel } from "../util/kinds";
 import { readable } from "../util/readable";
 import type { FileEntry } from "../types";
+import type { RenderTask } from "pdfjs-dist";
+import type { PdfDocument } from "../util/pdf";
+import { ON_LINUX } from "../util/platform";
 import { EntryIcon, newThumbId } from "./FileIcon";
 import { MetadataRows, Row } from "./Dialogs";
 import { useItemInfo } from "../hooks/useItemInfo";
@@ -193,7 +196,8 @@ type Shown =
   | { kind: "loading" }
   | { kind: "doc"; doc: Doc }
   | { kind: "picture"; src: string }
-  | { kind: "pdf"; pages: PageSize[] }
+  // `doc` is the pdf.js document that draws the pages on Linux. macOS draws them natively.
+  | { kind: "pdf"; pages: PageSize[]; doc?: PdfDocument }
   | { kind: "video"; src: string }
   | { kind: "icon" }
   | { kind: "failed"; message: string };
@@ -219,14 +223,19 @@ async function follow(href: string, docPath: string, stage: HTMLElement) {
   }
 }
 
-/** The reader draws text and data. Quick Look draws anything else as a picture. */
+/** The reader draws text and data. Anything else is a picture: Quick Look on macOS, a thumbnail on Linux. */
 async function load(entry: FileEntry): Promise<Shown> {
   const { path, ext } = entry;
   if (isPlayableVideo(ext)) return { kind: "video", src: convertFileSrc(path) };
-  // A PDF with a password, or still in the cloud, shows its Quick Look picture below.
+  // A PDF with a password, or still in the cloud, shows its picture below.
   if (fileKind(ext) === "pdf") {
-    const pages = await api.pdfPageSizes(path).catch(() => null);
-    if (pages?.length) return { kind: "pdf", pages };
+    if (ON_LINUX) {
+      const shown = await loadPdfJs(path);
+      if (shown) return shown;
+    } else {
+      const pages = await api.pdfPageSizes(path).catch(() => null);
+      if (pages?.length) return { kind: "pdf", pages };
+    }
   }
   if (await readable(path)) {
     return { kind: "doc", doc: { path, ...(await api.readDocument(path)) } };
@@ -236,6 +245,22 @@ async function load(entry: FileEntry): Promise<Shown> {
   } catch {
     return { kind: "icon" };
   }
+}
+
+/** Linux: the PDF opened by pdf.js, or null when it is locked or unreadable. */
+async function loadPdfJs(path: string): Promise<Shown | null> {
+  // Loaded apart, so the file manager never pays for pdf.js before a PDF is previewed.
+  const { openDoc, pageSizes } = await import("../util/pdf");
+  const task = openDoc(path);
+  try {
+    const doc = await task.promise;
+    const pages = await pageSizes(doc);
+    if (pages.length) return { kind: "pdf", doc, pages };
+    void doc.destroy().catch(() => {});
+  } catch {
+    // Locked or unreadable.
+  }
+  return null;
 }
 
 /**
@@ -316,6 +341,22 @@ function useStageZoom(stage: RefObject<HTMLDivElement | null>, kind: Shown["kind
   return { zoom, fit: fit.current, zoomTo };
 }
 
+/** True while the element is within one screen of the visible part of the preview. */
+function useNear(sheet: RefObject<HTMLDivElement | null>) {
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = sheet.current!;
+    // The newest change comes last. A busy page can get several at once.
+    const io = new IntersectionObserver((all) => setNear(all[all.length - 1].isIntersecting), {
+      root: el.closest(".pv-stage"),
+      rootMargin: "100% 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [sheet]);
+  return near;
+}
+
 /** One PDF page. It is drawn only near the view, so a long document stays light. */
 const PdfSheet = memo(function PdfSheet({
   path,
@@ -331,18 +372,8 @@ const PdfSheet = memo(function PdfSheet({
   px: number;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
-  const [near, setNear] = useState(false);
+  const near = useNear(sheet);
   const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    const el = sheet.current!;
-    // The newest change comes last. A busy page can get several at once.
-    const io = new IntersectionObserver((all) => setNear(all[all.length - 1].isIntersecting), {
-      root: el.closest(".pv-stage"),
-      rootMargin: "100% 0px",
-    });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
   useEffect(() => {
     if (!near) {
       setSrc(null);
@@ -370,15 +401,64 @@ const PdfSheet = memo(function PdfSheet({
   );
 });
 
+/** Linux: one PDF page drawn by pdf.js. It is drawn only near the view, so a long document stays light. */
+const PdfCanvasSheet = memo(function PdfCanvasSheet({
+  doc,
+  index,
+  page,
+  px,
+}: {
+  doc: PdfDocument;
+  index: number;
+  page: PageSize;
+  px: number;
+}) {
+  const sheet = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const near = useNear(sheet);
+  useEffect(() => {
+    if (!near) return;
+    let task: RenderTask | null = null;
+    let stale = false;
+    void (async () => {
+      try {
+        const drawn = await doc.getPage(index + 1);
+        if (stale) return;
+        const el = canvas.current!;
+        // `px` is the long side in device pixels, so it is the scale already.
+        const vp = drawn.getViewport({ scale: px / Math.max(page.w, page.h) });
+        el.width = Math.max(1, Math.round(vp.width));
+        el.height = Math.max(1, Math.round(vp.height));
+        task = drawn.render({ canvasContext: el.getContext("2d")!, viewport: vp });
+        await task.promise;
+      } catch {
+        // A cancelled render throws; the next one draws over it.
+      }
+    })();
+    // Fast scrolling leaves no queue of renders.
+    return () => {
+      stale = true;
+      task?.cancel();
+    };
+  }, [near, doc, index, page.w, page.h, px]);
+  return (
+    <div ref={sheet} className="pv-sheet" style={{ aspectRatio: `${page.w} / ${page.h}` }}>
+      <canvas ref={canvas} style={{ width: "100%", height: "100%" }} />
+    </div>
+  );
+});
+
 /** All of a PDF's pages, each as wide as the bar times `zoom`. */
 function PdfPages({
   path,
   modifiedMs,
+  doc,
   pages,
   zoom,
 }: {
   path: string;
   modifiedMs: number;
+  doc?: PdfDocument;
   pages: PageSize[];
   zoom: number;
 }) {
@@ -386,16 +466,14 @@ function PdfPages({
   const wide = bar * remPx() * zoom * window.devicePixelRatio;
   return (
     <div className="pv-pdf pv-in" style={{ width: `${zoom * 100}%` }}>
-      {pages.map((page, i) => (
-        <PdfSheet
-          key={i}
-          path={path}
-          modifiedMs={modifiedMs}
-          index={i}
-          page={page}
-          px={PDF_PAGE_PX.find((px) => px >= (wide * Math.max(page.w, page.h)) / page.w) ?? PDF_PAGE_PX[2]}
-        />
-      ))}
+      {pages.map((page, i) => {
+        const px = PDF_PAGE_PX.find((px) => px >= (wide * Math.max(page.w, page.h)) / page.w) ?? PDF_PAGE_PX[2];
+        return doc ? (
+          <PdfCanvasSheet key={i} doc={doc} index={i} page={page} px={px} />
+        ) : (
+          <PdfSheet key={i} path={path} modifiedMs={modifiedMs} index={i} page={page} px={px} />
+        );
+      })}
     </div>
   );
 }
@@ -423,13 +501,29 @@ function Preview({ entry }: { entry: FileEntry }) {
       live = false;
     };
   }, [enlarged, entry]);
+  // Linux: the pdf.js document behind the shown PDF. A replaced one is closed, so the worker frees its memory.
+  const pdfDoc = useRef<PdfDocument | null>(null);
+  useEffect(() => {
+    const doc = shown.kind === "pdf" ? (shown.doc ?? null) : null;
+    const was = pdfDoc.current;
+    pdfDoc.current = doc;
+    if (was && was !== doc) void was.destroy().catch(() => {});
+  }, [shown]);
+  useEffect(() => () => void pdfDoc.current?.destroy().catch(() => {}), []);
   useEffect(() => {
     let live = true;
     load(entry)
       .catch((err: unknown) => ({ kind: "failed", message: String(err) }) as const)
-      // A PDF being rewritten can't be read for a moment. Keep its pages, and the place in them.
-      // shortcut: a PDF that later gains a password keeps its old pages until it is reopened.
-      .then((s) => live && setShown((now) => (now.kind === "pdf" && s.kind !== "pdf" ? now : s)));
+      .then((s) => {
+        if (!live) {
+          // Never shown, so its document goes back at once.
+          if (s.kind === "pdf") void s.doc?.destroy().catch(() => {});
+          return;
+        }
+        // A PDF being rewritten can't be read for a moment. Keep its pages, and the place in them.
+        // shortcut: a PDF that later gains a password keeps its old pages until it is reopened.
+        setShown((now) => (now.kind === "pdf" && s.kind !== "pdf" ? now : s));
+      });
     return () => {
       live = false;
     };
@@ -465,7 +559,7 @@ function Preview({ entry }: { entry: FileEntry }) {
             </Suspense>
           )}
           {shown.kind === "pdf" && (
-            <PdfPages path={entry.path} modifiedMs={entry.modifiedMs} pages={shown.pages} zoom={zoom} />
+            <PdfPages path={entry.path} modifiedMs={entry.modifiedMs} doc={shown.doc} pages={shown.pages} zoom={zoom} />
           )}
           {shown.kind === "picture" && (
             <img

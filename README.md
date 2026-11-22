@@ -77,7 +77,7 @@ gh attestation verify doftar_v<version>_stable_macos.dmg --repo mhbsiam/doftar
 
 Doftar for Linux is a preview. It runs on Ubuntu 24.04 and later (x86_64).
 Most features work, but it has had less testing than the Mac app.
-[LINUX.md](https://github.com/mhbsiam/doftar/blob/linux/LINUX.md) lists what works and what is different.
+[LINUX.md](LINUX.md) lists what works, what is different, and how to build it from source.
 
 1. Download the `.deb` (or the `.AppImage`) from **Assets** on the
    **[latest release](https://github.com/mhbsiam/doftar/releases/latest)**.

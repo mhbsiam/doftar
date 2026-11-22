@@ -25,8 +25,6 @@ import type {
   SearchSummary,
   Step,
   SystemInfo,
-  Tag,
-  TagEdit,
   TrashStep,
   ArchiveListing,
   DupeReport,
@@ -34,10 +32,12 @@ import type {
   ImageEdit,
   ReaderDoc,
   DataTable,
-  PdfAction,
-  PdfState,
   ReaderOpen,
   Rect,
+  Tag,
+  TagEdit,
+  PdfState,
+  PdfAction,
 } from "./types";
 
 function progressChannel(onProgress: (p: Progress) => void): Channel<Progress> {
@@ -102,7 +102,7 @@ export const api = {
   requestFolderAccess: (path: string) => invoke<boolean>("request_folder_access", { path }),
   systemInfo: () => invoke<SystemInfo>("system_info"),
   logUiError: (kind: string, message: string) => invoke<void>("log_ui_error", { kind, message }),
-  copyDiagnostics: () => invoke<void>("copy_diagnostics"),
+  copyDiagnostics: () => invoke<string>("copy_diagnostics"),
   freeSpace: (path: string) => invoke<number | null>("free_space", { path }),
   pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   isFolder: (path: string) => invoke<boolean>("is_folder", { path }),
@@ -167,6 +167,7 @@ export const api = {
   /** Saves an image or text on the clipboard as a new file in `dest`. Null when it holds neither. */
   clipboardPasteData: (dest: string, stamp: string) => invoke<TrashStep | null>("clipboard_paste_data", { dest, stamp }),
   archiveList: (path: string) => invoke<ArchiveListing>("archive_list", { path }),
+  archiveExtractable: (name: string) => invoke<boolean>("archive_extractable", { name }),
   findDuplicates: (root: string, minSize: number, jobId: number, on: OnProgress) =>
     invoke<DupeReport>("find_duplicates", { root, minSize, jobId, onProgress: progressChannel(on) }),
   pauseJob: (jobId: number, paused: boolean) => invoke<void>("pause_job", { jobId, paused }),
@@ -213,7 +214,10 @@ export const api = {
   openLinkTarget: (path: string) => invoke<void>("open_link_target", { path }),
   /** Shows the items selected in a Finder window. */
   revealInFinder: (paths: string[]) => invoke<void>("reveal_in_finder", { paths }),
+  /** macOS: the system app chooser. */
   pickApplication: () => invoke<string | null>("pick_application"),
+  /** Linux: every installed application, for the in-app open-with chooser. */
+  allApps: () => invoke<AppInfo[]>("all_apps"),
   searchDir: (
     root: string,
     query: string,
@@ -256,6 +260,7 @@ export const api = {
     });
   },
   cancelSearch: (searchId: number) => invoke<void>("cancel_search", { searchId }),
+  /** Writes Finder/freedesktop tags. `add` is the tag to add (null to only remove). */
   editTags: (paths: string[], add: Tag | null, remove: string | null) =>
     invoke<TagEdit>("edit_tags", { paths, add, remove }),
   /** Includes tags without a color. Keyed by path. */
@@ -323,9 +328,9 @@ export const api = {
   thumbnailCached: (path: string, maxDim: number) =>
     invoke<string | null>("thumbnail_cached", { path, maxDim }),
   cancelThumbnail: (requestId: number) => invoke<void>("cancel_thumbnail", { requestId }),
-  /** Fails for a PDF that has a password or is still in the cloud. */
+  /** macOS. Fails for a PDF that has a password or is still in the cloud. */
   pdfPageSizes: (path: string) => invoke<{ w: number; h: number }[]>("pdf_page_sizes", { path }),
-  /** `cancelThumbnail` stops `requestId`. */
+  /** macOS. `cancelThumbnail` stops `requestId`. */
   pdfPagePicture: (path: string, index: number, maxDim: number, requestId?: number) =>
     invoke<string>("pdf_page_picture", { path, index, maxDim, requestId }),
   appLeftovers: (path: string) =>
@@ -368,7 +373,7 @@ export const api = {
   listImages: (dir: string) => invoke<string[]>("list_images", { dir }),
   /** For RAW, older HEIC and files outside the asset scope. Returns a copy the webview can decode. */
   viewerImage: (path: string) => invoke<string>("viewer_image", { path }),
-  /** `from` is where this page draws the icon. Resolves true if the thumbnail flies from there. */
+  /** Opens the PDF window. `from` is where this page draws the icon. Resolves true if the thumbnail flies from there. */
   openPdf: (path: string, from: Rect | null = null) =>
     invoke<boolean>("open_pdf", { path, from }),
   pdfAction: (action: PdfAction) => invoke<void>("pdf_action", { action }),

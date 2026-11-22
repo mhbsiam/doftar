@@ -1,5 +1,8 @@
 //! Turn, flip and crop images from the viewer. ImageIO keeps the format, colour profile and metadata.
 //! An edit applies to the image as shown (after the EXIF orientation), not to the stored pixels.
+//! On Linux the image crate does the same by applying the orientation at decode; the saved file
+//! drops the tags, which leaves upright pixels with no tag to rotate them back. Accepted for
+//! the port.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -68,6 +71,7 @@ fn edited(orientation: u32, edit: &Edit) -> Lin {
     m
 }
 
+#[cfg(target_os = "macos")]
 fn orientation_of(m: Lin) -> u32 {
     ORIENTATIONS.iter().position(|o| *o == m).map_or(1, |i| i as u32 + 1)
 }
@@ -98,7 +102,7 @@ pub async fn save_image_edit(
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    crate::jobs::blocking(move || save(Path::new(&path), &edit, as_copy, rev.as_deref())).await?
+    crate::jobs::blocking(move || save(&(crate::paths::real(&path)), &edit, as_copy, rev.as_deref())).await?
 }
 
 const CHANGED: &str = "the image changed on disk since it was opened, so the edits weren't applied to it";
@@ -130,10 +134,11 @@ fn save(path: &Path, edit: &Edit, as_copy: bool, rev: Option<&str>) -> Result<St
     let ext = format!(".{}", path.extension().unwrap_or_default().to_string_lossy());
 
     if as_copy {
+        // Lossy is fine here: the stem mints a fresh copy name, it does not resolve an existing path.
         let stem = path.file_stem().unwrap_or_default().to_string_lossy();
         let out = reserve(dir, &format!("{stem} (edited)"), &ext)?;
         return match imageio::write(path, &out, edit).and_then(|()| unchanged()) {
-            Ok(()) => Ok(out.to_string_lossy().into_owned()),
+            Ok(()) => Ok(crate::paths::encode(&out)),
             Err(e) => {
                 let _ = fs::remove_file(&out);
                 Err(e)
@@ -151,10 +156,12 @@ fn save(path: &Path, edit: &Edit, as_copy: bool, rev: Option<&str>) -> Result<St
     if res.is_err() {
         let _ = fs::remove_file(&tmp);
     }
-    res.map(|()| path.to_string_lossy().into_owned())
+    res.map(|()| crate::paths::encode(path))
 }
 
-/// Swap `new` in for `original` like the macOS safe save. Keep the permissions, creation date, tags and metadata of the original.
+/// Swap `new` in for `original` like the macOS safe save: the permissions, times, tags and
+/// other xattrs of the original survive. Linux cannot set a creation date, so that one
+/// detail of the original is lost there.
 pub(crate) fn replace_file(original: &Path, new: &Path) -> Result<(), String> {
     imageio::replace(original, new)
 }
@@ -366,16 +373,124 @@ mod imageio {
     }
 }
 
+/// The image crate decodes, bakes in the EXIF orientation and transforms the pixels, then
+/// writes them back in the original format. It drops EXIF, so a JPEG loses its orientation
+/// tag and camera metadata on Linux. Accepted for the port: the pixels are right, the tags
+/// are gone.
 #[cfg(not(target_os = "macos"))]
 mod imageio {
-    use super::Edit;
+    use super::{edited, ext_of, shown_size, Edit, Rect};
     use std::path::Path;
 
-    pub(super) fn write(_: &Path, _: &Path, _: &Edit) -> Result<(), String> {
-        Err("image editing needs macOS".into())
+    /// HEIC and HEIF have no decoder in the image crate. Naming the format beats a generic
+    /// read error, because the viewer just showed this file.
+    const UNREADABLE: &[&str] = &["heic", "heif"];
+
+    /// The decoded pixels, upright: the EXIF orientation is applied here, so an edit acts on
+    /// what the viewer showed. A single-frame gif decodes; an animated one would be flattened
+    /// by the edit, so it is refused, as the multi-page images are on macOS.
+    pub(super) fn decode(path: &Path) -> Result<image::DynamicImage, String> {
+        let ext = ext_of(path);
+        if UNREADABLE.contains(&ext.as_str()) {
+            return Err(format!("Doftar can't read {ext} images on Linux"));
+        }
+        if ext == "gif" {
+            use image::AnimationDecoder;
+            // GifDecoder::new bypasses the reader's allocation limits, so bound it here: a
+            // crafted header may claim 65535×65535, which is ~17 GB of pixels and an abort.
+            // The budget is the same 512 MiB the image crate defaults to elsewhere. The
+            // screen check alone is not enough — a frame's own descriptor may claim more
+            // than the screen, and the frame iterator allocates per frame — so the decoder
+            // carries the limit itself.
+            use image::ImageDecoder as _;
+            let mut dec = image::codecs::gif::GifDecoder::new(std::io::BufReader::new(
+                std::fs::File::open(path).map_err(|e| e.to_string())?,
+            ))
+            .map_err(|_| "Doftar can't read this image".to_string())?;
+            dec.set_limits(image::Limits::default())
+                .map_err(|_| "Doftar can't read this image".to_string())?;
+            let (w, h) = dec.dimensions();
+            if u64::from(w) * u64::from(h) * 4 > 512 * 1024 * 1024 {
+                return Err("Doftar can't read this image".into());
+            }
+            let mut frames = dec.into_frames();
+            let first = frames
+                .next()
+                .ok_or("Doftar can't read this image")?
+                .map_err(|_| "Doftar can't read this image".to_string())?;
+            if frames.next().is_some() {
+                return Err("Doftar can't edit animated or multi-page images".into());
+            }
+            return Ok(image::DynamicImage::ImageRgba8(first.into_buffer()));
+        }
+        use image::metadata::Orientation;
+        use image::ImageDecoder as _;
+        // TIFF pages past the first are not detected; the image crate shows the first.
+        let mut decoder = image::ImageReader::open(path)
+            .map_err(|_| "Doftar can't read this image".to_string())?
+            .with_guessed_format()
+            .map_err(|_| "Doftar can't read this image".to_string())?
+            .into_decoder()
+            .map_err(|_| "Doftar can't read this image".to_string())?;
+        let orientation = decoder.orientation().unwrap_or(Orientation::NoTransforms);
+        let mut img = image::DynamicImage::from_decoder(decoder)
+            .map_err(|_| "Doftar can't read this image".to_string())?;
+        img.apply_orientation(orientation);
+        Ok(img)
     }
-    pub(super) fn replace(_: &Path, _: &Path) -> Result<(), String> {
-        Err("image editing needs macOS".into())
+
+    /// Back in the original format: JPEG at the quality macOS used, or PNG, GIF, TIFF, BMP.
+    fn save(img: image::DynamicImage, out: &Path) -> Result<(), String> {
+        let mut file = std::fs::File::create(out).map_err(|e| e.to_string())?;
+        let saved = match ext_of(out).as_str() {
+            "jpg" | "jpeg" => img.write_with_encoder(
+                image::codecs::jpeg::JpegEncoder::new_with_quality(file, 92),
+            ),
+            "png" => img.write_to(&mut file, image::ImageFormat::Png),
+            "gif" => img.write_to(&mut file, image::ImageFormat::Gif),
+            "tif" | "tiff" => img.write_to(&mut file, image::ImageFormat::Tiff),
+            "bmp" => img.write_to(&mut file, image::ImageFormat::Bmp),
+            _ => return Err("Doftar can't save this kind of image".into()),
+        };
+        saved.map_err(|_| "Doftar couldn't save the image".to_string())
+    }
+
+    pub(super) fn write(path: &Path, out: &Path, edit: &Edit) -> Result<(), String> {
+        // The pixels come out upright: the orientation was applied at decode, so the edit and
+        // the crop act on what the viewer showed, and the saved file needs no orientation tag.
+        let m = edited(1, edit);
+        let img = decode(path)?;
+        let (sw, sh) = shown_size(m, img.width(), img.height());
+        let crop = edit.crop.unwrap_or(Rect { x: 0, y: 0, w: sw, h: sh });
+        if crop.w == 0
+            || crop.h == 0
+            || u64::from(crop.x) + u64::from(crop.w) > u64::from(sw)
+            || u64::from(crop.y) + u64::from(crop.h) > u64::from(sh)
+        {
+            return Err("the crop is outside the image".into());
+        }
+        // Clockwise quarter turns, then the horizontal mirror, as the shown image has it.
+        let mut shown = img;
+        for _ in 0..edit.turns % 4 {
+            shown = shown.rotate90();
+        }
+        if edit.mirror {
+            shown = shown.fliph();
+        }
+        save(shown.crop_imm(crop.x, crop.y, crop.w, crop.h), out)
+    }
+
+    /// `fs::rename` is atomic in the same directory. The rename swaps inodes, so the new file
+    /// inherits the original's permissions, times and xattrs (user.xdg.tags included) before it
+    /// takes its name — what the macOS safe save keeps too. Linux has no way to set a creation
+    /// date, so unlike on macOS that one detail of the original is lost.
+    pub(super) fn replace(original: &Path, new: &Path) -> Result<(), String> {
+        if let Ok(meta) = std::fs::metadata(original) {
+            let _ = std::fs::set_permissions(new, meta.permissions());
+        }
+        crate::fsops::copy::keep_times(original, new);
+        crate::fsops::copy::keep_xattrs(original, new);
+        std::fs::rename(new, original).map_err(|e| e.to_string())
     }
 }
 
@@ -596,10 +711,10 @@ mod tests {
         let before = fs::read(&p).unwrap();
         let first = save(&p, &edit(2, false, None), true, None).unwrap();
         let second = save(&p, &edit(2, false, None), true, None).unwrap();
-        assert_eq!(Path::new(&first).file_name().unwrap(), "a (edited).png");
-        assert_eq!(Path::new(&second).file_name().unwrap(), "a (edited) (2).png");
+        assert_eq!(crate::paths::real(&first).file_name().unwrap(), "a (edited).png");
+        assert_eq!(crate::paths::real(&second).file_name().unwrap(), "a (edited) (2).png");
         assert_eq!(fs::read(&p).unwrap(), before);
-        assert_eq!(look(Path::new(&first)).3, [White, Blue, Green, Red]);
+        assert_eq!(look(&crate::paths::real(&first)).3, [White, Blue, Green, Red]);
         fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -636,9 +751,250 @@ mod tests {
         let svg = dir.join("a.svg");
         fs::write(&svg, "<svg/>").unwrap();
         assert!(save(&svg, &edit(1, false, None), false, None).is_err());
-        assert!(save(Path::new("relative.png"), &edit(1, false, None), false, None).is_err());
+        assert!(save(&crate::paths::real("relative.png"), &edit(1, false, None), false, None).is_err());
         let names: Vec<_> = fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name()).collect();
         assert_eq!(names.len(), 2);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+/// The image crate renderer, where the ImageIO tests do not apply.
+#[cfg(all(test, not(target_os = "macos")))]
+mod linux_tests {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Clone, Copy)]
+    enum C {
+        Red,
+        Green,
+        Blue,
+        White,
+    }
+    const COLORS: [(C, [u8; 3]); 4] = [
+        (C::Red, [255, 0, 0]),
+        (C::Green, [0, 255, 0]),
+        (C::Blue, [0, 0, 255]),
+        (C::White, [255, 255, 255]),
+    ];
+
+    fn scratch(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("doftar-imgedit-lin-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&d);
+        fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    /// A 40 x 20 picture with four solid quadrants: red, green, blue, white.
+    fn make(path: &Path, ty: image::ImageFormat) {
+        let (w, h) = (40u32, 20u32);
+        let mut img = image::RgbaImage::new(w, h);
+        for y in 0..h {
+            for x in 0..w {
+                let c = COLORS[(y >= h / 2) as usize * 2 + (x >= w / 2) as usize].1;
+                img.put_pixel(x, y, image::Rgba([c[0], c[1], c[2], 255]));
+            }
+        }
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut fs::File::create(path).unwrap(), ty)
+            .unwrap();
+    }
+
+    /// The stored size and the four corners: top-left, top-right, bottom-left, bottom-right.
+    fn look(path: &Path) -> ((u32, u32), [C; 4]) {
+        use image::GenericImageView;
+        let img = image::ImageReader::open(path)
+            .unwrap()
+            .with_guessed_format()
+            .unwrap()
+            .decode()
+            .unwrap();
+        let (w, h) = (img.width(), img.height());
+        let at = |x: u32, y: u32| {
+            let p = img.get_pixel(x, y);
+            COLORS
+                .iter()
+                .min_by_key(|(_, c)| {
+                    (0..3).map(|i| (i32::from(p[i]) - i32::from(c[i])).abs()).sum::<i32>()
+                })
+                .unwrap()
+                .0
+        };
+        ((w, h), [at(1, 1), at(w - 2, 1), at(1, h - 2), at(w - 2, h - 2)])
+    }
+
+    use C::*;
+
+    fn edit(turns: u8, mirror: bool, crop: Option<Rect>) -> Edit {
+        Edit { turns, mirror, crop }
+    }
+
+    #[test]
+    fn turns_flips_and_crops_a_png() {
+        let dir = scratch("png");
+        let p = dir.join("a.png");
+        make(&p, image::ImageFormat::Png);
+        assert_eq!(look(&p).1, [Red, Green, Blue, White]);
+
+        save(&p, &edit(1, false, None), false, None).unwrap();
+        let (stored, corners) = look(&p);
+        assert_eq!(stored, (20, 40), "a quarter turn swaps the sides");
+        assert_eq!(corners, [Blue, Red, White, Green]);
+
+        save(&p, &edit(0, true, Some(Rect { x: 0, y: 0, w: 10, h: 40 })), false, None).unwrap();
+        let (stored, corners) = look(&p);
+        assert_eq!(stored, (10, 40));
+        assert_eq!(corners, [Red, Red, Green, Green]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn crops_after_turning() {
+        let dir = scratch("turncrop");
+        let p = dir.join("a.png");
+        make(&p, image::ImageFormat::Png);
+        save(&p, &edit(3, false, Some(Rect { x: 0, y: 30, w: 20, h: 10 })), false, None).unwrap();
+        let (stored, corners) = look(&p);
+        assert_eq!(stored, (20, 10));
+        assert_eq!(corners, [Red, Blue, Red, Blue]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_jpeg_stays_a_jpeg() {
+        let dir = scratch("jpg");
+        let p = dir.join("a.jpg");
+        make(&p, image::ImageFormat::Jpeg);
+        save(&p, &edit(1, false, None), false, None).unwrap();
+        let (stored, corners) = look(&p);
+        assert_eq!(stored, (20, 40));
+        assert_eq!(corners, [Blue, Red, White, Green]);
+        assert_eq!(fs::read(&p).unwrap()[..2], [0xff, 0xd8]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A JPEG of `img` with an EXIF orientation tag, spliced in as an APP1 segment after the SOI.
+    fn jpeg_with_orientation(img: &image::DynamicImage, orientation: u16) -> Vec<u8> {
+        let mut jpeg = Vec::new();
+        img.write_to(&mut std::io::Cursor::new(&mut jpeg), image::ImageFormat::Jpeg)
+            .unwrap();
+        // Big-endian TIFF: header, one IFD0 entry (tag 0x112, SHORT, count 1), no next IFD.
+        let mut tiff = Vec::new();
+        tiff.extend_from_slice(b"MM\x00*");
+        tiff.extend_from_slice(&[0u8, 0, 0, 8]); // the IFD starts right after the header
+        tiff.extend_from_slice(&[0u8, 1]); // one entry
+        tiff.extend_from_slice(&[0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01]);
+        tiff.extend_from_slice(&orientation.to_be_bytes());
+        tiff.extend_from_slice(&[0u8, 0]); // the rest of the SHORT value slot
+        tiff.extend_from_slice(&[0u8, 0, 0, 0]); // no next IFD
+        let mut out = jpeg[..2].to_vec(); // the SOI
+        out.extend_from_slice(&[0xff, 0xe1]);
+        out.extend_from_slice(&(tiff.len() as u16 + 8).to_be_bytes()); // "Exif\0\0", lengths
+        out.extend_from_slice(b"Exif\x00\x00");
+        out.extend_from_slice(&tiff);
+        out.extend_from_slice(&jpeg[2..]);
+        out
+    }
+
+    /// The quadrant picture as a JPEG carrying an EXIF orientation tag.
+    fn make_oriented(path: &Path, orientation: u16) {
+        let (w, h) = (40u32, 20u32);
+        let mut img = image::RgbaImage::new(w, h);
+        for y in 0..h {
+            for x in 0..w {
+                let c = COLORS[(y >= h / 2) as usize * 2 + (x >= w / 2) as usize].1;
+                img.put_pixel(x, y, image::Rgba([c[0], c[1], c[2], 255]));
+            }
+        }
+        let bytes = jpeg_with_orientation(&image::DynamicImage::ImageRgba8(img), orientation);
+        fs::write(path, bytes).unwrap();
+    }
+
+    #[test]
+    fn crops_what_is_shown_not_what_is_stored() {
+        let dir = scratch("exif");
+        let p = dir.join("photo.jpg");
+        make_oriented(&p, 6);
+        let shown = imageio::decode(&p).unwrap();
+        assert_eq!((shown.width(), shown.height()), (20, 40), "the pixels come out upright");
+
+        // The crop is in shown coordinates: it starts below the stored height of 20.
+        save(&p, &edit(0, false, Some(Rect { x: 0, y: 20, w: 10, h: 20 })), false, None).unwrap();
+        let (stored, corners) = look(&p);
+        assert_eq!(stored, (10, 20));
+        assert_eq!(corners, [White; 4]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn saves_a_copy_beside_the_original() {
+        let dir = scratch("copy");
+        let p = dir.join("a.png");
+        make(&p, image::ImageFormat::Png);
+        let before = fs::read(&p).unwrap();
+        let first = save(&p, &edit(2, false, None), true, None).unwrap();
+        let second = save(&p, &edit(2, false, None), true, None).unwrap();
+        assert_eq!(crate::paths::real(&first).file_name().unwrap(), "a (edited).png");
+        assert_eq!(crate::paths::real(&second).file_name().unwrap(), "a (edited) (2).png");
+        assert_eq!(fs::read(&p).unwrap(), before);
+        assert_eq!(look(&crate::paths::real(&first)).1, [White, Blue, Green, Red]);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn refuses_bad_crops_and_formats() {
+        let dir = scratch("bad");
+        let p = dir.join("a.png");
+        make(&p, image::ImageFormat::Png);
+        for crop in [Rect { x: 30, y: 0, w: 20, h: 10 }, Rect { x: 0, y: 0, w: 0, h: 10 }] {
+            assert!(save(&p, &edit(0, false, Some(crop)), false, None).is_err());
+        }
+        let heic = dir.join("a.heic");
+        fs::write(&heic, b"x").unwrap();
+        let err = save(&heic, &edit(1, false, None), false, None).unwrap_err();
+        assert!(err.contains("heic"), "{err}");
+        let svg = dir.join("a.svg");
+        fs::write(&svg, "<svg/>").unwrap();
+        assert!(save(&svg, &edit(1, false, None), false, None).is_err());
+        assert!(save(&crate::paths::real("relative.png"), &edit(1, false, None), false, None).is_err());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A save keeps the original's tags and times: the inode swap inherits them, like the
+    /// macOS safe save. Losing user.xdg.tags on every save was the silent kind of bug.
+    #[test]
+    fn a_save_keeps_tags_and_times() {
+        let dir = scratch("keep");
+        let p = dir.join("a.png");
+        make(&p, image::ImageFormat::Png);
+        fs::File::options().write(true).open(&p).unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
+            .unwrap();
+        use std::os::unix::ffi::OsStrExt;
+        let c = std::ffi::CString::new(p.as_os_str().as_bytes()).unwrap();
+        let tags = b"user.xdg.tags\0";
+        assert_eq!(unsafe { libc::lsetxattr(c.as_ptr(), tags.as_ptr().cast(), "Red".as_ptr().cast(), 3, 0) }, 0);
+        save(&p, &edit(1, false, None), false, None).unwrap();
+        let mut buf = [0u8; 16];
+        let n = unsafe { libc::lgetxattr(c.as_ptr(), tags.as_ptr().cast(), buf.as_mut_ptr().cast(), buf.len()) };
+        assert_eq!(n, 3);
+        assert_eq!(&buf[..n as usize], b"Red");
+        assert_eq!(fs::metadata(&p).unwrap().modified().unwrap(), std::time::SystemTime::UNIX_EPOCH);
+        assert_eq!(look(&p).0, (20, 40)); // the quarter turn happened too
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A GIF header claiming 65535×65535 is ~17 GB of pixels. Decode must refuse it
+    /// instead of trying to allocate and aborting the whole app.
+    #[test]
+    fn a_lying_gif_is_refused_not_allocated() {
+        let dir = scratch("gif");
+        let p = dir.join("huge.gif");
+        let mut b = b"GIF89a".to_vec();
+        b.extend_from_slice(&65535u16.to_le_bytes());
+        b.extend_from_slice(&65535u16.to_le_bytes());
+        b.extend_from_slice(&[0x00, 0x00, 0x00, 0x3B]);
+        fs::write(&p, &b).unwrap();
+        assert_eq!(imageio::decode(&p).unwrap_err(), "Doftar can't read this image");
         fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -9,6 +9,7 @@ import { parentOf, useTabs } from "../stores/tabs";
 import { useUI } from "../stores/ui";
 import { formatSize } from "../util/format";
 import type { DupeReport } from "../types";
+import { os } from "../util/platform";
 
 /** Smaller files are not worth the reading. Most of what a disk loses to copies is in big ones. */
 const MIN_BYTES = 1_000_000;
@@ -101,7 +102,7 @@ export function DiskDuplicates({ title, open }: { title: React.ReactNode; open: 
         <>
           <p className="disk-hint">
             {report.groups.length.toLocaleString()} sets{report.truncated ? " (the largest 500)" : ""}, up to{" "}
-            {formatSize(report.wasted)} taken by extra copies. A copy made in Finder or Doftar on this disk shares its
+            {formatSize(report.wasted)} taken by extra copies. {os("A copy made in Finder or Doftar on this disk shares its", "A copy made with reflinks, like `cp --reflink`, shares its")}{" "}
             storage with the original, so removing it may free less than shown.
           </p>
           <ul className="disk-filelist">

@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
+#[cfg_attr(not(target_os = "macos"), allow(unused_imports))]
 use tauri::{AppHandle, Manager, WebviewWindow};
 
 /// Tab for each new window, held until its page asks for it.

@@ -77,7 +77,7 @@ export function GridView(props: Props) {
   const win = useVirtualWindow(listRef, entries.length, true, groups, iconSize);
   const itemInfo = useSettings((s) => s.gridItemInfo);
   const iconPx = Math.round(iconSize * useSettings((s) => s.textScale));
-  // ⌘-scroll and trackpad pinch (ctrl-wheel) change the icon size.
+  // Ctrl+-scroll and trackpad pinch (ctrl-wheel) change the icon size.
   // Use a native listener. The wheel listener of React is passive.
   useEffect(() => {
     const el = listRef.current;

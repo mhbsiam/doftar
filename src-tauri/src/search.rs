@@ -136,7 +136,7 @@ fn has_tag(e: &FileEntry, names: &[String]) -> bool {
 }
 
 fn is_package_name(name: &str) -> bool {
-    Path::new(name)
+    crate::paths::real(name)
         .extension()
         .map(|e| PACKAGE_EXTS.contains(&e.to_string_lossy().to_lowercase().as_str()))
         .unwrap_or(false)
@@ -209,8 +209,8 @@ fn run_spotlight(
         // Cancelled before the pid was set.
         let _ = child.kill();
     }
-    let root_path = Path::new(root.unwrap_or("/"));
-    let real_root = fs::canonicalize(root_path).ok().filter(|r| r != root_path);
+    let root_path = crate::paths::real(root.unwrap_or("/"));
+    let real_root = fs::canonicalize(&root_path).ok().filter(|r| *r != root_path);
     if let Some(out) = child.stdout.take() {
         // Read raw bytes. `.lines()` stops at the first non-UTF-8 name (SMB, NFS, exFAT) and reports the search as complete.
         for line in BufReader::new(out).split(b'\n').map_while(Result::ok) {
@@ -218,9 +218,10 @@ fn run_spotlight(
                 break;
             }
             let line = OsString::from_vec(line);
-            let p = under_root(root_path, real_root.as_deref(), Path::new(&line));
+            let line_path = crate::paths::real(&line);
+            let p = under_root(&root_path, real_root.as_deref(), &line_path);
             let p = p.as_ref();
-            if p == root_path || buried(root_path, p, show_hidden) {
+            if p == root_path || buried(&root_path, p, show_hidden) {
                 continue;
             }
             let Ok(meta) = fs::symlink_metadata(p) else { continue };
@@ -268,7 +269,8 @@ fn run_scan(
             }
             let Ok(meta) = item.metadata() else { continue };
             let path = item.path();
-            let descend = meta.is_dir() && !meta.file_type().is_symlink() && !is_package_name(&name);
+            // DirEntry::metadata follows links, so the descent guard needs the link itself.
+            let descend = item.file_type().is_ok_and(|ft| ft.is_dir()) && !is_package_name(&name);
             if name.to_lowercase().contains(&needle) {
                 if let Some(e) = build_entry(&path, name, meta, show_hidden).filter(|e| keep(e)) {
                     sink.push(e);
@@ -282,7 +284,7 @@ fn run_scan(
     false
 }
 
-/// Walk `root` where Spotlight does not index. Folder listings read tags only for items with a Finder label, so tags without a colour are missed.
+/// Walk `root` for tagged items. Used where Spotlight does not index, and where there is no Spotlight at all.
 fn run_tag_scan(
     root: &Path,
     names: &[String],
@@ -294,7 +296,7 @@ fn run_tag_scan(
     let mut visited = 0usize;
     let mut queue = std::collections::VecDeque::from([root.to_path_buf()]);
     while let Some(dir) = queue.pop_front() {
-        let Ok(entries) = crate::fsops::list_dir_sync(&dir.to_string_lossy(), show_hidden) else {
+        let Ok(entries) = crate::fsops::list_dir_sync(&crate::paths::encode(&dir), show_hidden) else {
             continue;
         };
         for e in entries {
@@ -306,7 +308,7 @@ fn run_tag_scan(
             }
             visited += 1;
             if e.is_dir && !e.is_package && !e.is_symlink {
-                queue.push_back(PathBuf::from(&e.path));
+                queue.push_back(crate::paths::real(&e.path));
             }
             if has_tag(&e, names) {
                 sink.push(e);
@@ -328,7 +330,7 @@ pub async fn search_tags(
     let key = job_key(&webview, search_id);
     crate::jobs::blocking(move || {
         if let Some(r) = &root {
-            if !Path::new(r).is_dir() {
+            if !crate::paths::real(r).is_dir() {
                 return Err(format!("{r} isn't a folder"));
             }
         }
@@ -350,10 +352,12 @@ pub async fn search_tags(
                 &mut sink,
             );
         if !ran {
-            if let Some(r) = &root {
-                source = "scan";
-                truncated = run_tag_scan(Path::new(r), &names, show_hidden, &cancel, &mut sink);
-            }
+            source = "scan";
+            // No root meant "everywhere Spotlight indexes". With no Spotlight, home stands in.
+            let root = root.as_deref().map(crate::paths::real).unwrap_or_else(|| {
+                dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+            });
+            truncated = run_tag_scan(&root, &names, show_hidden, &cancel, &mut sink);
         } else if sink.full() {
             truncated = true;
         }
@@ -394,7 +398,7 @@ fn search_dir_sync(
     if query.is_empty() {
         return Ok(SearchSummary { count: 0, truncated: false, source: "spotlight" });
     }
-    if !Path::new(&root).is_dir() {
+    if !crate::paths::real(&root).is_dir() {
         return Err(format!("{root} isn't a folder"));
     }
     let cancel = CANCELS.begin(key.clone());
@@ -421,7 +425,7 @@ fn search_dir_sync(
     let spotlight_empty = named.get() == 0 && !cancel.load(Ordering::Relaxed);
     if !via_spotlight || spotlight_empty {
         source = "scan";
-        truncated = run_scan(Path::new(&root), &query, show_hidden, |e| only.keeps(e), &cancel, &mut sink);
+        truncated = run_scan(&(crate::paths::real(&root)), &query, show_hidden, |e| only.keeps(e), &cancel, &mut sink);
     } else if sink.full() {
         truncated = true;
     }
@@ -485,25 +489,25 @@ mod tests {
 
     #[test]
     fn buried_detects_hidden_and_package_ancestors() {
-        let root = Path::new("/r");
-        assert!(buried(root, Path::new("/r/.git/x"), false));
-        assert!(!buried(root, Path::new("/r/.git/x"), true));
-        assert!(buried(root, Path::new("/r/T.app/Contents/x"), true));
-        assert!(!buried(root, Path::new("/r/.hidden"), false), "the item itself is judged by build_entry");
-        assert!(!buried(root, Path::new("/r/a/b"), false));
+        let root = crate::paths::real("/r");
+        assert!(buried(&root, &crate::paths::real("/r/.git/x"), false));
+        assert!(!buried(&root, &crate::paths::real("/r/.git/x"), true));
+        assert!(buried(&root, &crate::paths::real("/r/T.app/Contents/x"), true));
+        assert!(!buried(&root, &crate::paths::real("/r/.hidden"), false), "the item itself is judged by build_entry");
+        assert!(!buried(&root, &crate::paths::real("/r/a/b"), false));
     }
 
     #[test]
     fn spotlight_results_map_back_under_a_symlinked_root() {
-        let root = Path::new("/var/folders/x");
-        let real = Some(Path::new("/private/var/folders/x"));
-        let p = Path::new("/private/var/folders/x/a/b.txt");
-        assert_eq!(under_root(root, real, p), Path::new("/var/folders/x/a/b.txt"));
-        assert_eq!(under_root(root, real, Path::new("/private/var/folders/x")), root);
-        let elsewhere = Path::new("/Users/me/b.txt");
-        assert_eq!(under_root(root, real, elsewhere), elsewhere, "left for buried() to drop");
-        let plain = Path::new("/var/folders/x/c");
-        assert_eq!(under_root(root, None, plain), plain);
+        let root = crate::paths::real("/var/folders/x");
+        let real = Some(crate::paths::real("/private/var/folders/x"));
+        let p = crate::paths::real("/private/var/folders/x/a/b.txt");
+        assert_eq!(under_root(&root, real.as_deref(), &p), crate::paths::real("/var/folders/x/a/b.txt"));
+        assert_eq!(under_root(&root, real.as_deref(), &crate::paths::real("/private/var/folders/x")), root);
+        let elsewhere = crate::paths::real("/Users/me/b.txt");
+        assert_eq!(under_root(&root, real.as_deref(), &elsewhere), elsewhere, "left for buried() to drop");
+        let plain = crate::paths::real("/var/folders/x/c");
+        assert_eq!(under_root(&root, None, &plain), plain);
     }
 
     #[test]

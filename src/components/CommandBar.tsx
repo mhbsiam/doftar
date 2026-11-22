@@ -81,6 +81,7 @@ import {
   togglePreview,
 } from "../actions";
 import type { GroupBy, SortKey, ViewMode } from "../types";
+import { ariaKeys, keys, ON_LINUX } from "../util/platform";
 
 function CmdDivider() {
   return <span className="cmdiv" />;
@@ -133,12 +134,12 @@ function PreviewToggle() {
   const label = open ? "Hide preview" : "Show preview";
   const Icon = open ? PanelRightContractRegular : PanelRightExpandRegular;
   return (
-    <Tooltip content={`${label} (⇧⌘P)`} relationship="label">
+    <Tooltip content={keys(`${label} (⇧⌘P)`)} relationship="label">
       <button
         className="cmd horizontal compact"
         aria-label="Preview"
         aria-pressed={open}
-        aria-keyshortcuts="Meta+Shift+P"
+        aria-keyshortcuts={ariaKeys("Meta+Shift+P")}
         onClick={() => togglePreview()}
       >
         <Icon />
@@ -149,11 +150,11 @@ function PreviewToggle() {
 
 function PaletteButton() {
   return (
-    <Tooltip content="Command palette (⌘K)" relationship="label">
+    <Tooltip content={keys("Command palette (⌘K)")} relationship="label">
       <button
         className="cmd horizontal compact"
         aria-label="Command palette"
-        aria-keyshortcuts="Meta+K"
+        aria-keyshortcuts={ariaKeys("Meta+K")}
         onClick={() => useUI.getState().setPaletteOpen(true)}
       >
         <KeyCommandRegular />
@@ -164,11 +165,11 @@ function PaletteButton() {
 
 function PatternButton() {
   return (
-    <Tooltip content="Select by pattern (⇧⌘S)" relationship="label">
+    <Tooltip content={keys("Select by pattern (⇧⌘S)")} relationship="label">
       <button
         className="cmd horizontal compact pattern-btn"
         aria-label="Select by pattern"
-        aria-keyshortcuts="Meta+Shift+S"
+        aria-keyshortcuts={ariaKeys("Meta+Shift+S")}
         onClick={() => useUI.getState().setSelectPatternOpen(true)}
       >
         <TextAsteriskRegular />
@@ -271,11 +272,11 @@ function ActivityButton({ inFolder }: { inFolder: boolean }) {
   return (
     <Menu open={open && enabled} onOpenChange={(_, d) => setOpen(d.open)}>
       <MenuTrigger disableButtonEnhancement>
-        <Tooltip content="Activity (⌘⇧V)" relationship="label">
+        <Tooltip content={keys("Activity (⌘⇧V)")} relationship="label">
           <button
             className="cmd horizontal compact"
             aria-label="Activity"
-            aria-keyshortcuts="Meta+Shift+V"
+            aria-keyshortcuts={ariaKeys("Meta+Shift+V")}
             disabled={!enabled}
           >
             <ClipboardClockRegular />
@@ -765,12 +766,15 @@ export function CommandBar() {
         onClick={() => toggleSplit()}
       />
       <CmdDivider />
-      <CmdButton
-        label="Share"
-        icon={<ShareIosRegular />}
-        disabled={!hasSelection}
-        onClick={(e) => shareItems(tab.selection, e.currentTarget)}
-      />
+      {/* Linux has no system share sheet. */}
+      {!ON_LINUX && (
+        <CmdButton
+          label="Share"
+          icon={<ShareIosRegular />}
+          disabled={!hasSelection}
+          onClick={(e) => shareItems(tab.selection, e.currentTarget)}
+        />
+      )}
       <CmdButton
         className="fold-first"
         label="Compare"

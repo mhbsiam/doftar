@@ -118,7 +118,7 @@ export const topOf = (list: HistoryEntry[]): HistoryEntry | undefined =>
 
 const name = (p: string) => p.split("/").filter(Boolean).pop() ?? p;
 const dirOf = (p: string) => p.slice(0, p.lastIndexOf("/")) || "/";
-const TRASH = /\/\.Trash(?:es\/\d+)?(?:\/|$)/;
+const TRASH = /\/\.Trash(?:es\/\d+)?(?:\/|$)|\/\.local\/share\/Trash\/files(?:\/|$)|\/\.Trash-\d+\/files(?:\/|$)/;
 const what = (paths: string[]) => (paths.length === 1 ? `"${name(paths[0])}"` : `${paths.length} items`);
 
 export function placeName(dir: string, home: string): string {

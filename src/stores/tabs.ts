@@ -364,10 +364,11 @@ const makePane = (pane: number) => createStore<TabsStore>()((set, get) => {
 
     setActive: (id) => {
       const { tabs, activeId } = get();
-      if (id === activeId) return;
+      if (id === activeId || isTabClosing(id)) return;
       const from = tabs.findIndex((t) => t.id === activeId);
       const to = tabs.findIndex((t) => t.id === id);
-      rememberView(tabs[from]);
+      if (to < 0) return;
+      if (from >= 0) rememberView(tabs[from]);
       showTab(to > from ? "forward" : "back", tabs[from], tabs[to]);
     },
 

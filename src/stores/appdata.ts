@@ -3,6 +3,7 @@ import { api } from "../ipc";
 import type { FavItem, PersistedStore, RecentItem, Step, TrashOrigin } from "../types";
 import { useHistory, type HistoryEntry, type SavedEntry } from "./history";
 import { useUI } from "./ui";
+import { ON_LINUX } from "../util/platform";
 
 export interface CloudDrive {
   name: string;
@@ -47,6 +48,8 @@ interface AppDataStore {
   /** `readOnly`: the saved store could not be read, so it is left as it is. */
   phase: "loading" | "ready" | "readOnly";
   home: string;
+  /** The real Trash folder: ~/.Trash on macOS, the backend's answer (honoring `$XDG_DATA_HOME`) on Linux. */
+  trashDir: string | null;
   pins: string[];
   cloudDrives: CloudDrive[];
   favorites: FavItem[];
@@ -303,6 +306,7 @@ const NO_TRASH_ORIGINS: AppDataStore["trashOrigins"] = {};
 export const useAppData = create<AppDataStore>((set, get) => ({
   phase: "loading",
   home: "/",
+  trashDir: null,
   pins: [],
   cloudDrives: [],
   favorites: NO_FAVORITES,
@@ -347,6 +351,7 @@ export const useAppData = create<AppDataStore>((set, get) => ({
     set({
       phase,
       home,
+      trashDir: info?.trashDir ?? (ON_LINUX ? null : `${home}/.Trash`),
       pins,
       cloudDrives,
       favorites: now.favorites !== NO_FAVORITES ? now.favorites : favorites,

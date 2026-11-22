@@ -55,6 +55,7 @@ import { TrashIcon, WinDriveIcon, WinNetworkDriveIcon, useFolderColor } from "./
 import { TRASH_LIMIT_BYTES, useTrashSize } from "../hooks/useTrashSize";
 import { formatSize } from "../util/format";
 import type { FileEntry, Location, VolumeInfo } from "../types";
+import { APPS_DIR } from "../util/platform";
 
 // The navigation pane shows the filled icon of a selected row (see .navicon in global.css).
 const AppsIcon = bundleIcon(AppsFilled, AppsRegular);
@@ -299,7 +300,8 @@ export function NavPane() {
       .catch(() => {});
   }, []);
   const savedSearches = useSettings((s) => s.savedSearches);
-  const trashPath = home ? `${home}/.Trash` : null;
+  // The real Trash (on Linux it honors $XDG_DATA_HOME), as the backend's system info reports it.
+  const trashPath = useAppData((s) => s.trashDir);
   const trashBytes = useTrashSize(trashPath);
   const trashColor = useFolderColor(trashPath ?? undefined);
   const volumes: VolumeInfo[] = (info?.volumes ?? []).filter(
@@ -518,11 +520,11 @@ export function NavPane() {
       <NavRow
         label="Apps"
         icon={<AppsIcon />}
-        selected={activePath === "/Applications"}
-        onClick={() => navigateTo({ kind: "path", path: "/Applications" })}
-        title="/Applications"
-        drop="path:/Applications"
-        menu={() => placeMenu(() => navigateTo({ kind: "path", path: "/Applications" }))}
+        selected={activePath === APPS_DIR}
+        onClick={() => navigateTo({ kind: "path", path: APPS_DIR })}
+        title={APPS_DIR}
+        drop={`path:${APPS_DIR}`}
+        menu={() => placeMenu(() => navigateTo({ kind: "path", path: APPS_DIR }))}
       />
       {PAGES.filter((p) => !TOOL_PAGES.includes(p.kind) && !hiddenPlaces.includes(p.kind)).map((p) => (
         <NavRow
@@ -543,19 +545,21 @@ export function NavPane() {
             colorId={trashColor}
           />
         }
-        selected={activePath === `${home}/.Trash`}
-        onClick={() => navigateTo({ kind: "path", path: `${home}/.Trash` })}
+        selected={activePath === trashPath}
+        onClick={() => trashPath !== null && navigateTo({ kind: "path", path: trashPath })}
         title={
-          trashBytes === null
-            ? `${home}/.Trash`
-            : `Trash · ${formatSize(trashBytes)}`
+          trashPath === null
+            ? undefined
+            : trashBytes === null
+              ? trashPath
+              : `Trash · ${formatSize(trashBytes)}`
         }
         drop="trash"
         menu={() => [
           {
             key: "open",
             label: "Open",
-            onSelect: () => navigateTo({ kind: "path", path: `${home}/.Trash` }),
+            onSelect: () => trashPath !== null && navigateTo({ kind: "path", path: trashPath }),
           },
           { key: "empty", label: "Empty Trash", dividerBefore: true, onSelect: emptyTrash },
         ]}

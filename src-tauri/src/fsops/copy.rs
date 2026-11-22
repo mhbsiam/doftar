@@ -232,7 +232,7 @@ pub(super) mod macos_copy {
                 c.last = copied;
             }
             (RECURSE_FILE, STAGE_FINISH) if !src.is_null() => {
-                let path = Path::new(OsStr::from_bytes(unsafe { CStr::from_ptr(src) }.to_bytes()));
+                let path = crate::paths::real(OsStr::from_bytes(unsafe { CStr::from_ptr(src) }.to_bytes()));
                 if let Some(m) = fs::symlink_metadata(path).ok().filter(|m| m.is_file()) {
                     c.finish(m.len());
                 }
@@ -288,6 +288,56 @@ pub(super) mod macos_copy {
     }
 }
 
+/// Keeps the source's atime and mtime on the copy, links included.
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn keep_times(from: &Path, to: &Path) {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(meta) = fs::symlink_metadata(from) else { return };
+    let times = [
+        libc::timespec { tv_sec: meta.atime(), tv_nsec: meta.atime_nsec() },
+        libc::timespec { tv_sec: meta.mtime(), tv_nsec: meta.mtime_nsec() },
+    ];
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(c) = std::ffi::CString::new(to.as_os_str().as_bytes()) else { return };
+    unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), libc::AT_SYMLINK_NOFOLLOW) };
+}
+
+/// Copies `user.*` and other writable xattrs, links included. Best effort:
+/// filesystems without xattrs and attributes the user may not set are skipped.
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn keep_xattrs(from: &Path, to: &Path) {
+    use std::os::unix::ffi::OsStrExt;
+    let (Ok(src), Ok(dst)) = (
+        std::ffi::CString::new(from.as_os_str().as_bytes()),
+        std::ffi::CString::new(to.as_os_str().as_bytes()),
+    ) else {
+        return;
+    };
+    unsafe {
+        let n = libc::llistxattr(src.as_ptr(), std::ptr::null_mut(), 0);
+        if n <= 0 {
+            return;
+        }
+        let mut list = vec![0u8; n as usize];
+        let n = libc::llistxattr(src.as_ptr(), list.as_mut_ptr() as *mut _, list.len());
+        if n <= 0 {
+            return;
+        }
+        for name in list[..n as usize].split(|&b| b == 0).filter(|s| !s.is_empty()) {
+            let Ok(name_c) = std::ffi::CString::new(name) else { continue };
+            let v = libc::lgetxattr(src.as_ptr(), name_c.as_ptr(), std::ptr::null_mut(), 0);
+            if v < 0 {
+                continue;
+            }
+            let mut val = vec![0u8; v as usize];
+            let v = libc::lgetxattr(src.as_ptr(), name_c.as_ptr(), val.as_mut_ptr() as *mut _, val.len());
+            if v >= 0 {
+                libc::lsetxattr(dst.as_ptr(), name_c.as_ptr(), val.as_ptr() as *const _, v as usize, 0);
+            }
+        }
+    }
+}
+
 #[cfg(not(target_os = "macos"))]
 fn copy_downloaded(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
     use std::io::{Read, Write};
@@ -305,8 +355,17 @@ fn copy_downloaded(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
             let item = item?;
             copy_downloaded(&item.path(), &to.join(item.file_name()), job)?;
         }
+        fs::set_permissions(to, meta.permissions())?;
     } else if meta.file_type().is_symlink() {
         std::os::unix::fs::symlink(fs::read_link(from)?, to)?;
+    } else if !meta.is_file() {
+        // A FIFO blocks forever on open, a socket fails late, and a device file reads
+        // endlessly. copyfile refused them too, so a clear error beats hanging the job
+        // where Cancel could not reach it.
+        return Err(std::io::Error::other(format!(
+            "\"{}\": special files can't be copied",
+            label(from)
+        )));
     } else {
         let mut src = fs::File::open(from)?;
         let mut dst = fs::OpenOptions::new().write(true).create_new(true).open(to)?;
@@ -324,6 +383,12 @@ fn copy_downloaded(from: &Path, to: &Path, job: &Job) -> std::io::Result<()> {
             job.add_bytes(n as u64);
         }
         fs::set_permissions(to, meta.permissions())?;
+    }
+    keep_times(from, to);
+    keep_xattrs(from, to);
+    // A copy on one volume is a clone of the same blocks. Reading both sides would prove nothing.
+    if job.verifies() && !on_same_volume(from, to.parent().unwrap_or(to)) {
+        verify_tree(from, to, job)?;
     }
     Ok(())
 }

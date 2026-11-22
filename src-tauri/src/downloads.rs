@@ -2,6 +2,7 @@
 //! Only a subscriber on the file's own folder sees it, so each watched cloud folder is subscribed.
 //! While a download runs, the interface gets `cloud:downloads`. When it ends, the interface gets `fs:changed`.
 
+#[cfg(any(target_os = "macos", test))]
 pub fn is_cloud(path: &str) -> bool {
     path.contains("/Library/CloudStorage/") || path.contains("/Library/Mobile Documents/")
 }
@@ -9,7 +10,7 @@ pub fn is_cloud(path: &str) -> bool {
 /// Downloads an online-only cloud file. Reading the file makes its drive download all of it.
 #[tauri::command(async)]
 pub fn download_file(path: String) -> Result<(), String> {
-    download(std::path::Path::new(&path))
+    download(&(crate::paths::real(&path)))
 }
 
 pub(crate) fn download(path: &std::path::Path) -> Result<(), String> {
@@ -161,7 +162,7 @@ mod mac {
             drop(rows);
             drop(live);
             for path in ended {
-                if let Some(dir) = std::path::Path::new(&path).parent() {
+                if let Some(dir) = crate::paths::real(&path).parent() {
                     let _ = app.emit("fs:changed", dir.to_string_lossy());
                 }
             }

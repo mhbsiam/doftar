@@ -2,6 +2,7 @@
 //! Doftar keeps the mark on files it unpacks from a marked archive. Gatekeeper then checks them on first run, as after Finder.
 
 use std::ffi::CString;
+#[cfg(target_os = "macos")]
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -14,6 +15,7 @@ fn cstr(path: &Path) -> Option<CString> {
 }
 
 /// Raw value of extended attribute `name` on `path` itself. Does not follow a symlink.
+#[cfg(target_os = "macos")]
 pub fn read_xattr(path: &Path, name: &str) -> Option<Vec<u8>> {
     let p = cstr(path)?;
     let n = CString::new(name).ok()?;
@@ -41,6 +43,34 @@ pub fn read_xattr(path: &Path, name: &str) -> Option<Vec<u8>> {
     Some(buf)
 }
 
+/// Raw value of extended attribute `name` on `path` itself. Does not follow a symlink.
+/// Linux xattrs need a `user.`/`trusted.`/`security.`/`system.` prefix, so the
+/// `com.apple.*` names used on macOS read as `None` here.
+#[cfg(not(target_os = "macos"))]
+pub fn read_xattr(path: &Path, name: &str) -> Option<Vec<u8>> {
+    let p = cstr(path)?;
+    let n = CString::new(name).ok()?;
+    let len = unsafe { libc::lgetxattr(p.as_ptr(), n.as_ptr(), std::ptr::null_mut(), 0) };
+    if len < 0 {
+        return None;
+    }
+    let mut buf = vec![0u8; len as usize];
+    let got = unsafe {
+        libc::lgetxattr(
+            p.as_ptr(),
+            n.as_ptr(),
+            buf.as_mut_ptr() as *mut libc::c_void,
+            buf.len(),
+        )
+    };
+    if got < 0 {
+        return None;
+    }
+    buf.truncate(got as usize);
+    Some(buf)
+}
+
+#[cfg(target_os = "macos")]
 fn write_xattr(path: &Path, name: &str, value: &[u8]) -> bool {
     let (Some(p), Ok(n)) = (cstr(path), CString::new(name)) else {
         return false;
@@ -58,6 +88,24 @@ fn write_xattr(path: &Path, name: &str, value: &[u8]) -> bool {
     rc == 0
 }
 
+#[cfg(not(target_os = "macos"))]
+#[allow(dead_code)] // apply_tree, its only caller, does nothing on Linux
+fn write_xattr(path: &Path, name: &str, value: &[u8]) -> bool {
+    let (Some(p), Ok(n)) = (cstr(path), CString::new(name)) else {
+        return false;
+    };
+    let rc = unsafe {
+        libc::lsetxattr(
+            p.as_ptr(),
+            n.as_ptr(),
+            value.as_ptr() as *const libc::c_void,
+            value.len(),
+            0,
+        )
+    };
+    rc == 0
+}
+
 pub fn read(path: &Path) -> Option<Vec<u8>> {
     read_xattr(path, QUARANTINE)
 }
@@ -68,6 +116,15 @@ pub fn is_quarantined(path: &Path) -> bool {
 
 /// Mark `path` and, for a folder, all items inside. A symlink gets the mark and is not followed.
 /// Returns the number of items it could not mark.
+#[cfg(not(target_os = "macos"))]
+pub fn apply_tree(_path: &Path, _mark: &[u8]) -> usize {
+    // The quarantine mark is a macOS concept. No kernel on Linux checks it.
+    0
+}
+
+/// Mark `path` and, for a folder, all items inside. A symlink gets the mark and is not followed.
+/// Returns the number of items it could not mark.
+#[cfg(target_os = "macos")]
 pub fn apply_tree(path: &Path, mark: &[u8]) -> usize {
     let mut failed = 0;
     let mut stack = vec![path.to_path_buf()];
@@ -103,7 +160,7 @@ pub fn where_froms(path: &Path) -> Vec<String> {
         .unwrap_or_default()
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
 

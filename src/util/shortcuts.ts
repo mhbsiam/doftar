@@ -2,18 +2,20 @@
  * The keyboard shortcut sheet (Help → Keyboard Shortcuts). Keep in step with docs/REFERENCE.md.
  * Each row is [action, Mac keys, Windows-style keys]. A row with no Windows key shows the Mac one.
  */
-export const SHORTCUTS: { group: string; keys: [string, string, string?][] }[] = [
+import { FILE_MANAGER, keys, os } from "./platform";
+
+const SHEET: { group: string; keys: [string, string, string?][] }[] = [
   {
     group: "Files",
     keys: [
       ["Open selection", "⌘↓ or Enter", "Enter"],
-      ["Quick Look", "Space"],
+      [os("Quick Look", "Preview in the built-in viewer"), "Space"],
       ["Properties", "⌘I or ⌥Enter", "Alt+Enter"],
       ["Rename (several items: batch rename)", "F2"],
       ["New folder / text document", "⌘⇧N / ⌘⌥N", "Ctrl+Shift+N / Ctrl+Alt+N"],
       ["New folder with selection", "⌃⌘N"],
       ["Duplicate", "⌘D", "Ctrl+D"],
-      ["Reveal in Finder", "⌥⌘R"],
+      [`Reveal in ${FILE_MANAGER}`, "⌥⌘R"],
       ["Copy / Cut / Paste", "⌘C / ⌘X / ⌘V", "Ctrl+C / X / V"],
       ["Move item here", "⌘⌥V"],
       ["Activity: paste or undo", "⌘⇧V", "Ctrl+Shift+V"],
@@ -67,3 +69,9 @@ export const SHORTCUTS: { group: string; keys: [string, string, string?][] }[] =
     ],
   },
 ];
+
+/** The sheet with its Mac keys in this system's form. */
+export const SHORTCUTS = SHEET.map(({ group, keys: rows }) => ({
+  group,
+  keys: rows.map(([what, mac, ...win]): [string, string, string?] => [what, keys(mac), ...win]),
+}));

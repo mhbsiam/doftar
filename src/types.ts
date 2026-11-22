@@ -121,6 +121,8 @@ export interface SystemInfo {
   home: string;
   bootVolumeName: string;
   volumes: VolumeInfo[];
+  /** The real Trash folder, honoring `$XDG_DATA_HOME`. Null when it cannot be resolved. */
+  trashDir: string | null;
 }
 
 export type Location =

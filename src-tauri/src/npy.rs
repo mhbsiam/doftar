@@ -249,11 +249,19 @@ fn preview<R: Read + Seek>(h: &Header, mut src: Forward<R>) -> Result<Table, Str
     let size = t.size as u64;
     let mut grid = vec![vec![None; shown_cols]; shown_rows];
     let io = |e: io::Error| format!("the array is cut short ({e})");
+    // The header's shape is untrusted: the offsets must not wrap, or the read would
+    // seek backwards into the file and show header bytes as data.
+    let stride = |count: u64, lanes: u64| -> Result<u64, String> {
+        count
+            .checked_mul(lanes)
+            .and_then(|cells| cells.checked_mul(size))
+            .ok_or_else(|| "the shape in the header doesn't fit a file".to_string())
+    };
     if h.fortran && n == 2 {
         // Each column is stored whole, one after another.
         let mut buf = vec![0u8; shown_rows * t.size];
         for j in 0..shown_cols {
-            src.read_at(j as u64 * rows * size, &mut buf).map_err(io)?;
+            src.read_at(stride(rows, j as u64)?, &mut buf).map_err(io)?;
             for (i, row) in grid.iter_mut().enumerate() {
                 row[j] = Some(cell(&t, &buf[i * t.size..]));
             }
@@ -261,7 +269,7 @@ fn preview<R: Read + Seek>(h: &Header, mut src: Forward<R>) -> Result<Table, Str
     } else {
         let mut buf = vec![0u8; shown_cols * t.size];
         for (i, row) in grid.iter_mut().enumerate() {
-            src.read_at(i as u64 * cols * size, &mut buf).map_err(io)?;
+            src.read_at(stride(cols, i as u64)?, &mut buf).map_err(io)?;
             for (j, value) in row.iter_mut().enumerate() {
                 *value = Some(cell(&t, &buf[j * t.size..]));
             }

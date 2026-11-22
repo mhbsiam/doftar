@@ -92,7 +92,7 @@ pub async fn read_docx_text(path: String) -> Result<String, String> {
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    crate::jobs::blocking(move || read_docx_sync(Path::new(&path))).await?
+    crate::jobs::blocking(move || read_docx_sync(&(crate::paths::real(&path)))).await?
 }
 
 #[cfg(test)]

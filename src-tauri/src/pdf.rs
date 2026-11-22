@@ -39,7 +39,7 @@ pub struct PdfState {
     found: Option<bool>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
 #[serde(tag = "do", rename_all = "camelCase")]
 pub enum PdfAction {
     /// `index` starts at 0.
@@ -109,8 +109,8 @@ pub async fn open_pdf(
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    let p = Path::new(&path);
-    if !p.is_absolute() || !is_pdf(p) {
+    let p = crate::paths::real(&path);
+    if !p.is_absolute() || !is_pdf(&(p)) {
         return Err("not a PDF".into());
     }
     let meta = fs::metadata(p).map_err(|e| e.to_string())?;
@@ -510,7 +510,7 @@ mod native {
             }
             refresh(n, ns);
         });
-        let title = std::path::Path::new(path)
+        let title = crate::paths::real(path)
             .file_name()
             .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
         let _ = win.set_title(&title);
@@ -638,12 +638,44 @@ mod native {
 
 #[cfg(not(target_os = "macos"))]
 mod native {
+    //! Linux. pdf.js draws the document in the page itself, so the backend only tracks which file
+    //! is open, tells the page when it changes, and passes actions from other windows through.
+
     use super::{PdfAction, PdfState};
-    use tauri::{WebviewWindow, Window};
+    use crate::lock::Locked;
+    use std::sync::Mutex;
+    use tauri::{Emitter, Manager, WebviewWindow, Window};
+
+    /// The open file, if any. The page loads and draws it itself.
+    static PATH: Mutex<Option<String>> = Mutex::new(None);
+
+    pub fn state() -> PdfState {
+        PdfState { path: PATH.locked().clone(), ..Default::default() }
+    }
+
+    fn send<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+        let _ = app.emit_to(super::LABEL, "pdf:state", state());
+    }
 
     pub fn install(_: &WebviewWindow) {}
-    pub fn open(_: &WebviewWindow, _: &str) {}
-    pub fn close(_: &Window) {}
+
+    /// The caller shows the window. Runs on the main thread.
+    pub fn open(win: &WebviewWindow, path: &str) {
+        *PATH.locked() = Some(path.to_string());
+        let title = crate::paths::real(path)
+            .file_name()
+            .map_or_else(|| path.to_string(), |n| n.to_string_lossy().into_owned());
+        let _ = win.set_title(&title);
+        send(win.app_handle());
+    }
+
+    /// Call after the window hides. Runs on the main thread.
+    pub fn close(win: &Window) {
+        *PATH.locked() = None;
+        let _ = win.set_title("PDF");
+        send(win.app_handle());
+    }
+
     pub fn first_page(_: &WebviewWindow) -> Option<(crate::zoom::CssRect, f64)> {
         None
     }
@@ -653,8 +685,9 @@ mod native {
     pub fn shown(_: &Window) -> Option<String> {
         None
     }
-    pub fn act(_: &WebviewWindow, _: PdfAction) {}
-    pub fn state() -> PdfState {
-        PdfState { error: Some("PDFs need macOS".into()), ..Default::default() }
+
+    /// The page handles every action itself. Other windows use pdf_action to reach it.
+    pub fn act(win: &WebviewWindow, action: PdfAction) {
+        let _ = win.app_handle().emit_to(super::LABEL, "pdf:action", &action);
     }
 }

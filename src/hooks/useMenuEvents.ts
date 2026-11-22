@@ -41,6 +41,7 @@ import { setFolderView, stepIconSize } from "./useFolderView";
 import { activeModal, useUI } from "../stores/ui";
 import { flushAppData, useAppData } from "../stores/appdata";
 import { saveSessionNow } from "../session";
+import { APPS_DIR } from "../util/platform";
 
 export const EDIT_ADDRESS_EVENT = "wf:edit-address";
 
@@ -201,11 +202,12 @@ export function runCommand(id: string, field: TextField | null = focusedTextFiel
       return;
     case "toggle_verify_copies": {
       const s = useSettings.getState();
-      s.set({ verifyCopies: !s.verifyCopies });
+      const on = !s.verifyCopies;
+      s.set({ verifyCopies: on });
       useUI.getState().pushToast(
-        s.verifyCopies
-          ? "Copies to other drives are no longer verified"
-          : "Copies and moves to other drives are now read back and compared. They take about twice as long."
+        on
+          ? "Copies and moves to other drives are now read back and compared. They take about twice as long."
+          : "Copies to other drives are no longer verified"
       );
       return;
     }
@@ -242,7 +244,7 @@ export function runCommand(id: string, field: TextField | null = focusedTextFiel
       if (!field) openTerminalHere();
       return;
     case "extract":
-      extractSelection();
+      void extractSelection();
       return;
     case "folder_tree":
       showFolderTreeHere();
@@ -348,7 +350,7 @@ export function runCommand(id: string, field: TextField | null = focusedTextFiel
       goToHomeChild("Downloads");
       return;
     case "go_applications":
-      tabs.navigate({ kind: "path", path: "/Applications" });
+      tabs.navigate({ kind: "path", path: APPS_DIR });
       return;
     case "go_to_folder":
       window.dispatchEvent(new Event(EDIT_ADDRESS_EVENT));

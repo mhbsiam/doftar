@@ -2,7 +2,10 @@ import tseslint from "typescript-eslint";
 import reactHooks from "eslint-plugin-react-hooks";
 
 /** Type-aware rules stay off: `tsc --noEmit` in `npm run build` already checks types. */
-export default tseslint.config(...tseslint.configs.recommended, {
+export default tseslint.config(
+  // A `tauri build` drops CMake artifacts into src-tauri/target; dist is generated too.
+  { ignores: ["dist/**", "src-tauri/target/**"] },
+  ...tseslint.configs.recommended, {
   plugins: { "react-hooks": reactHooks },
   rules: {
     "react-hooks/rules-of-hooks": "error",

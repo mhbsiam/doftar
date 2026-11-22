@@ -77,7 +77,8 @@ export function useDirectory(
       });
     }
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const isHomeTrash = path === `${useAppData.getState().home}/.Trash`;
+    // The backend reports the real Trash in the system info (on Linux it honors $XDG_DATA_HOME).
+    const isHomeTrash = path === useAppData.getState().trashDir;
     let extras: string[] = [];
     // An unwatch can arrive before its watch and find nothing to release. Make each unwatch wait for its watch.
     const watching = new Map<string, Promise<unknown>>();

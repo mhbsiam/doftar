@@ -2,7 +2,9 @@
 
 Everything that doesn't fit in the [README](../README.md): the full feature list,
 keyboard shortcuts, building from source and publishing a release. The source
-layout is in [ARCHITECTURE.md](ARCHITECTURE.md).
+layout is in [ARCHITECTURE.md](ARCHITECTURE.md). This page describes the Mac app.
+The Linux app is built from the same source; [LINUX.md](../LINUX.md) lists what
+differs there and how to build it.
 
 - [Features](#features)
 - [Keyboard shortcuts](#keyboard-shortcuts)

@@ -31,7 +31,7 @@ export function StatusBar() {
     const t = setTimeout(() => setMeasured(selectionDirs), selectionDirs.length ? 300 : 0);
     return () => clearTimeout(t);
   }, [selectionDirs]);
-  // More folders than this, as after ⌘A, could mean walking a whole drive. ⌘I still measures them.
+  // More folders than this, as after Ctrl+A, could mean walking a whole drive. Ctrl+I still measures them.
   const tooMany = selectionDirs.length > MEASURE_MAX;
   const dirSize = useFolderSize(measured, measured.length > 0 && !tooMany && measured === selectionDirs);
   const [free, setFree] = useState<number | null>(null);

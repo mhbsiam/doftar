@@ -13,7 +13,22 @@ permissions:
   attestations: write
 
 jobs:
+  # The Actions tab lets anyone pick a branch to run this from. From any other branch it would build,
+  # tag v<version> and publish unreviewed code as the release. Only main may release.
+  only-from-main:
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Refuse to release from any branch but main
+        if: github.ref != 'refs/heads/main'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          echo "::error::Release runs only from main. This run was started from $REF."
+          exit 1
+
   ci:
+    needs: only-from-main
     uses: ./.github/workflows/ci.yml
 
   release:

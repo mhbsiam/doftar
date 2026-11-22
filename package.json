@@ -2,7 +2,7 @@
   "name": "doftar",
   "private": true,
   "version": "1.0.3",
-  "description": "A free, offline macOS file manager with tabs, split view and built-in viewers for code, data and notebooks.",
+  "description": "A free, offline file manager for macOS and Linux with tabs, split view and built-in viewers for code, data and notebooks.",
   "license": "Apache-2.0",
   "author": "Hasanul Banna Siam",
   "type": "module",
@@ -46,12 +46,14 @@
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-opener": "^2.2.6",
     "lowlight": "^3.3.0",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.6.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

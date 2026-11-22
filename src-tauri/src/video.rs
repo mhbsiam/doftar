@@ -71,8 +71,8 @@ pub async fn open_video(
     if crate::watcher::is_ejecting(&path) {
         return Err("volume is being ejected".to_string());
     }
-    let p = Path::new(&path);
-    if !p.is_absolute() || !is_video(p) {
+    let p = crate::paths::real(&path);
+    if !p.is_absolute() || !is_video(&(p)) {
         return Err("Doftar's player doesn't play this kind of file".into());
     }
     let meta = fs::metadata(p).map_err(|e| e.to_string())?;
@@ -149,11 +149,11 @@ mod tests {
 
     #[test]
     fn plays_only_what_webkit_plays() {
-        assert!(is_video(Path::new("/a/clip.MP4")));
-        assert!(is_video(Path::new("/a/clip.webm")));
-        assert!(is_video(Path::new("/a/song.FLAC")));
-        assert!(!is_video(Path::new("/a/song.ogg")));
-        assert!(!is_video(Path::new("/a/clip.mkv")));
-        assert!(!is_video(Path::new("/a/clip")));
+        assert!(is_video(&(crate::paths::real("/a/clip.MP4"))));
+        assert!(is_video(&(crate::paths::real("/a/clip.webm"))));
+        assert!(is_video(&(crate::paths::real("/a/song.FLAC"))));
+        assert!(!is_video(&(crate::paths::real("/a/song.ogg"))));
+        assert!(!is_video(&(crate::paths::real("/a/clip.mkv"))));
+        assert!(!is_video(&(crate::paths::real("/a/clip"))));
     }
 }

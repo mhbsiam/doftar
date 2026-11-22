@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MusicNote2Regular, NextRegular, PreviousRegular } from "@fluentui/react-icons";
 import { api } from "../ipc";
 import { extOf, isPlayableAudio } from "../util/kinds";
+import { logUiError } from "../util/uiErrors";
 import { CaptionButtons } from "./CaptionButtons";
 
 const win = getCurrentWindow();
@@ -49,7 +50,10 @@ export function VideoPlayer() {
       .then((first) => {
         if (first) open(first, true);
       })
-      .catch(() => {});
+      .catch((err) => {
+        // A dead ready command means the first video never lands here and the window sits blank. Say so in the log.
+        logUiError("video ready", err);
+      });
     // Closing hides the window. Stop here to release the file.
     const unHidden = win.listen("video:hidden", () => setPath(null));
     const unMenu = win.listen<string>("menu", ({ payload }) => {

@@ -8,6 +8,7 @@ import { useFileIds } from "../stores/fileIds";
 import { folderStops, type FolderColorId } from "../util/folderColors";
 import { extColor, fileKind, isFolder, isImageExt, isQuickLookExt } from "../util/kinds";
 import type { FileEntry } from "../types";
+import { EXTERNAL_PATH } from "../util/platform";
 
 /**
  * The own color of this folder, if any. List entries carry their file id.
@@ -676,7 +677,7 @@ function BaseIcon({ entry, size }: { entry: FileEntry; size: number }) {
   const isApp = entry.isDir && entry.ext === "app";
   // Options → Privacy can turn off previews of other volumes.
   const externalThumbs = useSettings((s) => s.externalThumbnails);
-  const allowed = externalThumbs || !entry.path.startsWith("/Volumes/");
+  const allowed = externalThumbs || !EXTERNAL_PATH.test(entry.path);
   const wanted =
     allowed &&
     (isApp ||

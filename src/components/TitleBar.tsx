@@ -10,6 +10,7 @@ import { moveTabToNewWindow } from "../actions";
 import { useUI } from "../stores/ui";
 import { useSettings } from "../stores/settings";
 import { useIncomingTab } from "../tabTransfer";
+import { isTabClosing } from "../util/tabClose";
 
 function InsertCaret() {
   const m = useIncomingTab((s) => s.marker);
@@ -207,7 +208,11 @@ export function TitleBar() {
                   const store = useTabs.getState();
                   const move = (to: number) => {
                     e.preventDefault();
-                    const next = store.tabs[(to + store.tabs.length) % store.tabs.length];
+                    const live = store.tabs.filter((x) => !isTabClosing(x.id));
+                    if (!live.length) return;
+                    const at = Math.max(0, live.findIndex((x) => x.id === t.id));
+                    const target = to === store.tabs.length - 1 ? live.length - 1 : to === 0 ? 0 : at + (to - i);
+                    const next = live[(target + live.length) % live.length];
                     store.setActive(next.id);
                     focusActiveTab();
                   };

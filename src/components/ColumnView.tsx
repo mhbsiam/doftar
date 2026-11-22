@@ -20,6 +20,7 @@ import { formatDate, formatSize } from "../util/format";
 import { sortEntries } from "../util/grouping";
 import { isFolder, typeLabel } from "../util/kinds";
 import type { FileEntry } from "../types";
+import { EXTERNAL_PATH } from "../util/platform";
 
 interface Props {
   dir: string;
@@ -274,7 +275,7 @@ function FileSummary({ entry }: { entry: FileEntry }) {
   useEffect(() => {
     setPicture(null);
     // A cloud file with no local data would be downloaded to draw it.
-    if (entry.isDataless || (!externalThumbs && entry.path.startsWith("/Volumes/"))) return;
+    if (entry.isDataless || (!externalThumbs && EXTERNAL_PATH.test(entry.path))) return;
     let live = true;
     let replied = false;
     const id = newThumbId();

@@ -2,14 +2,19 @@
 # Run: `cargo deny --manifest-path src-tauri/Cargo.toml check`.
 
 [graph]
-# Doftar ships for Apple silicon Macs only. Dependencies of other platforms (for example the tauri iOS/Android HTTP client) are not in the binary.
-targets = ["aarch64-apple-darwin"]
+# Doftar ships for Apple silicon Macs and x86_64 Linux. Dependencies of other platforms (for example the tauri iOS/Android HTTP client) are not in either binary.
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu"]
 
 [advisories]
 version = 2
 yanked = "deny"
 ignore = [
-  { id = "RUSTSEC-2026-0543", reason = "unmaintained, no fix; pulled in by arrow/parquet only" },
+  { id = "RUSTSEC-2026-0543", reason = "unmaintained, no fix; pulled in by arrow/parquet and trash (freedesktop deletion dates)" },
+  # Linux only. Tauri's GTK stack and its opener plugin bring these in; Doftar can't replace them.
+  { id = "RUSTSEC-2024-0370", reason = "proc-macro-error: unmaintained, build-time only; via glib-macros in the GTK 0.18 bindings" },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant: unmaintained; via zbus in tauri-plugin-opener" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names: unmaintained; via zbus in tauri-plugin-opener" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive: unmaintained, build-time only; via zbus in tauri-plugin-opener" },
 ]
 
 [licenses]
@@ -29,11 +34,16 @@ allow = [
 confidence-threshold = 0.8
 # Doftar is never published to crates.io. Only its dependencies are checked.
 private = { ignore = true }
+# Linux only, at build time: the GTK -sys crates use system-deps, which uses target-lexicon.
+# Apache-2.0 with the LLVM exception is at least as permissive as Apache-2.0.
+exceptions = [
+  { crate = "target-lexicon", allow = ["Apache-2.0 WITH LLVM-exception"] },
+]
 
 [bans]
 multiple-versions = "allow"
 wildcards = "allow"
-# Doftar makes no network connections. Any of these in the macOS dependency graph is a bug.
+# Doftar makes no network connections. Any of these in the macOS or Linux dependency graph is a bug.
 deny = [
   { crate = "reqwest", reason = "Doftar is offline: no HTTP client" },
   { crate = "hyper", reason = "Doftar is offline: no HTTP stack" },
@@ -53,7 +63,7 @@ deny = [
   { crate = "tauri-plugin-updater", reason = "Doftar is offline: updates are manual downloads" },
   { crate = "tauri-plugin-websocket", reason = "Doftar is offline" },
   { crate = "tauri-plugin-shell", reason = "the webview must not run shell commands" },
-  { crate = "sentry", reason = "no crash reporting leaves the Mac" },
+  { crate = "sentry", reason = "no crash reporting leaves the computer" },
   { crate = "rustls", reason = "nothing to encrypt in transit: Doftar is offline" },
   { crate = "native-tls", reason = "nothing to encrypt in transit: Doftar is offline" },
   { crate = "openssl", reason = "nothing to encrypt in transit: Doftar is offline" },

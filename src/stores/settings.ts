@@ -6,6 +6,7 @@ import { dateFormat, type ClockStyle, type DateStyle } from "../util/format";
 import { applyTextScale } from "../util/textScale";
 import { DEFAULT_LIST_COLUMNS, type ColumnKey, type ColumnWidths } from "../util/listColumns";
 import { runTransition, runViewSwitch } from "../util/transition";
+import { ON_LINUX } from "../util/platform";
 
 export type ThemePref = "system" | "light" | "dark";
 export type WindowButtons = "macos" | "windows";
@@ -112,7 +113,8 @@ export const useSettings = create<SettingsStore>()(
     (set, get) => ({
       theme: "system",
       textScale: 1,
-      windowButtons: "macos",
+      // Linux window controls sit on the right.
+      windowButtons: ON_LINUX ? "windows" : "macos",
       folderColor: "teal",
       selectionColor: null,
       folderColors: {},

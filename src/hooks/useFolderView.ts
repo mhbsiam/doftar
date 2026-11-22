@@ -6,6 +6,7 @@ import { ICON_SIZES } from "./useVirtual";
 import { useFileIds } from "../stores/fileIds";
 import { useAppData } from "../stores/appdata";
 import { useActiveTab, useTabs } from "../stores/tabs";
+import { APPS_DIR } from "../util/platform";
 
 const pathOf = (location: { kind: string; path?: string }) =>
   location.kind === "path" ? (location.path ?? null) : null;
@@ -24,7 +25,7 @@ const pick = (s: ViewPrefs): ViewPrefs => ({
 });
 
 /** The Apps page is always sorted by name, ascending, and never grouped. */
-const APPS_PAGE = "/Applications";
+const APPS_PAGE = APPS_DIR;
 
 /** These places start with their own view. The user's own choices there win. */
 const DOWNLOADS_VIEW: Partial<ViewPrefs> = { groupBy: "created", sortKey: "modified", sortAsc: true };

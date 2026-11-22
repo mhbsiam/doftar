@@ -13,7 +13,11 @@ vi.hoisted(() => {
     addEventListener: () => {},
     querySelector: () => null,
     querySelectorAll: () => [],
-    documentElement: { style: { setProperty: () => {} }, classList: { toggle: () => {} }, dataset: {} },
+    documentElement: {
+      style: { setProperty: () => {} },
+      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+      dataset: {},
+    },
   };
 });
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ label: "main" }) }));

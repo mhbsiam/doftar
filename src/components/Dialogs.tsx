@@ -16,8 +16,9 @@ import { parentOf } from "../stores/tabs";
 import { useFolderSize } from "../hooks/useFolderSize";
 import { useItemInfo } from "../hooks/useItemInfo";
 import { formatDuration, formatFps, isMedia, useMedia, useMediaOf } from "../stores/media";
-import { clearAppCache, copyText, getViewEntries, openWithOther, renameMany, selectMatching, setAppearance, setTag, transfer, typedPath } from "../actions";
+import { clearAppCache, copyText, getViewEntries, openWithOther, pickApp, renameMany, selectMatching, setAppearance, setTag, transfer, typedPath } from "../actions";
 import { nameMatcher } from "../util/itemFilter";
+import { ON_LINUX, os } from "../util/platform";
 import { rankNames, splitDraft, tabComplete } from "../util/pathComplete";
 import { visitBonus } from "../util/palette";
 import { useAppData } from "../stores/appdata";
@@ -27,7 +28,7 @@ import { planRename, type RenameRule } from "../util/batchRename";
 import { SHORTCUTS } from "../util/shortcuts";
 import { HELP } from "../util/help";
 import { TAG_COLORS, COLOR_TAGS, isColorTag } from "../util/tags";
-import type { Checksums, ConflictSide, MetaGroup, FileEntry, Resolution, Resolutions } from "../types";
+import type { AppInfo, Checksums, ConflictSide, MetaGroup, FileEntry, Resolution, Resolutions } from "../types";
 import { CommandPalette } from "./CommandPalette";
 
 const FOCUSABLE = "button:not(:disabled), [href], input, select, textarea, [tabindex]:not([tabindex='-1'])";
@@ -83,6 +84,7 @@ function useDialogKeys(onEscape: () => void, onEnter: () => void) {
 
 export function DialogHost() {
   const confirm = useUI((s) => s.confirm);
+  const appPicker = useUI((s) => s.appPicker);
   const properties = useUI((s) => s.properties);
   const conflictSpec = useUI((s) => s.conflictSpec);
   const newTagFor = useUI((s) => s.newTagFor);
@@ -97,6 +99,7 @@ export function DialogHost() {
   return (
     <>
       {confirm && <ConfirmDialog key="confirm" />}
+      {appPicker && <AppPickerDialog key="app-picker" />}
       {conflictSpec && <ConflictDialog key={`conflicts-${conflictSpec.id}`} />}
       {properties && <PropertiesDialog key="props" />}
       {newTagFor && <NewTagDialog key="new-tag" />}
@@ -175,7 +178,7 @@ function NewTagDialog() {
   const inputRef = useRef<HTMLInputElement>(null);
   const trimmed = name.trim();
   // A tag cannot have the name of a colour tag (Finder treats it as that tag).
-  // The attribute stores each tag as "name\ncolour".
+  // On macOS the attribute stores each tag as "name\ncolour"; on Linux the xattr joins names with ";".
   const problem = !trimmed
     ? null
     : trimmed.includes("\n")
@@ -308,6 +311,86 @@ function SelectPatternDialog() {
   );
 }
 
+/** Chooser for "open with another app": every installed launcher, searchable. */
+function AppPickerDialog() {
+  const spec = useUI((s) => s.appPicker)!;
+  const close = useUI((s) => s.closeAppPicker);
+  const [apps, setApps] = useState<AppInfo[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    void api.allApps().then(setApps).catch(() => setApps([]));
+  }, []);
+  useEffect(() => inputRef.current?.focus(), []);
+  const needle = draft.trim().toLowerCase();
+  const matches = (apps ?? []).filter((a) => a.name.toLowerCase().includes(needle));
+  const cancel = useCallback(() => {
+    spec.onCancel();
+    close();
+  }, [spec, close]);
+  const pick = useCallback(
+    (path: string) => {
+      spec.onPick(path);
+      close();
+    },
+    [spec, close]
+  );
+  const { primaryRef, dialogRef } = useDialogKeys(cancel, () => matches[0] && pick(matches[0].path));
+  return (
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && cancel()}>
+      <div ref={dialogRef} className="dialog" role="dialog" aria-modal="true" aria-labelledby="wf-dialog-title">
+        <div className="dialog-title" id="wf-dialog-title">Open with another application</div>
+        <div className="dialog-body send-to">
+          <input
+            ref={inputRef}
+            className="text-input"
+            aria-label="Search applications"
+            placeholder="Search applications…"
+            value={draft}
+            spellCheck={false}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="send-to-list app-picker" role="listbox" aria-label="Applications">
+            {apps === null ? (
+              <p className="field-hint">Listing applications…</p>
+            ) : matches.length === 0 ? (
+              <p className="field-hint">
+                {apps.length === 0 ? "No applications found." : "Nothing matches the search."}
+              </p>
+            ) : (
+              matches.slice(0, 80).map((a) => (
+                <button
+                  key={a.path}
+                  className="send-to-row"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => pick(a.path)}
+                >
+                  <span className="send-to-name">{a.name}</span>
+                  <span className="send-to-detail">{basename(a.path)}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+        <div className="dialog-actions">
+          <button className="btn subtle" onClick={cancel}>
+            Cancel
+          </button>
+          <button
+            ref={primaryRef}
+            className="btn accent"
+            disabled={matches.length === 0}
+            onClick={() => matches[0] && pick(matches[0].path)}
+          >
+            Open
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SendToDialog() {
   const { paths, mode } = useUI((s) => s.sendTo)!;
   const close = useUI((s) => s.closeSendTo);
@@ -431,7 +514,8 @@ function ShortcutsDialog() {
   const setOpen = useUI((s) => s.setShortcutsOpen);
   const close = useCallback(() => setOpen(false), [setOpen]);
   const { primaryRef, dialogRef } = useDialogKeys(close, close);
-  const [windows, setWindows] = useState(false);
+  // On Linux, start on the keyboard style the user picked for the window buttons.
+  const [windows, setWindows] = useState(ON_LINUX && useSettings.getState().windowButtons === "windows");
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div
@@ -475,7 +559,10 @@ function ShortcutsDialog() {
           ))}
           <p className="rename-note">
             {windows
-              ? "Keys with ⌘ have no Windows-style version; on a PC keyboard ⌘ is the Windows key."
+              ? os(
+                  "Keys with ⌘ have no Windows-style version; on a PC keyboard ⌘ is the Windows key.",
+                  "Keys with Ctrl+ have no Windows-style version; on a PC keyboard, press them as shown."
+                )
               : "Most Windows keys work too, with Ctrl in place of ⌘."}
           </p>
         </div>
@@ -899,7 +986,7 @@ function AppSelect({
   const choose = async (value: string) => {
     const s = useSettings.getState();
     if (value !== OTHER_APP) return s.set({ [appKey]: value });
-    const app = await api.pickApplication().catch(() => null);
+    const app = await pickApp().catch(() => null);
     if (!app) return;
     // The terminal list leaves out code editors, so such a pick would be saved and never shown.
     if (appKey === "terminalApp" && currentEditors().list.some((t) => t.path === app)) {
@@ -996,14 +1083,17 @@ function SettingsDialog() {
           <Row label="Text size">
             <Seg label="Text size" value={s.textScale} options={TEXT_SIZES} onPick={(textScale) => s.set({ textScale })} />
           </Row>
-          <Row label="Window buttons">
-            <Seg
-              label="Window buttons"
-              value={s.windowButtons}
-              options={WINDOW_BUTTONS}
-              onPick={(windowButtons) => s.set({ windowButtons })}
-            />
-          </Row>
+          {/* Linux uses the window manager's own buttons, so there is nothing to style. */}
+          {!ON_LINUX && (
+            <Row label="Window buttons">
+              <Seg
+                label="Window buttons"
+                value={s.windowButtons}
+                options={WINDOW_BUTTONS}
+                onPick={(windowButtons) => s.set({ windowButtons })}
+              />
+            </Row>
+          )}
           <Row label="Folder color">
             <Swatches
               label="Folder color"
@@ -1050,7 +1140,7 @@ function SettingsDialog() {
           <Check k="showHidden" label="Show hidden files" />
           <Check k="showCheckboxes" label="Show selection checkboxes" />
           <Check k="gridItemInfo" label="Show each file's size in Icons view" />
-          <Check k="searchContents" label="Search inside files, not only names" />
+          {!ON_LINUX && <Check k="searchContents" label="Search inside files, not only names" />}
           <Check k="columnStats" label="Show min, max and missing counts in data tables" />
           <Check k="swipeNavigation" label="Swipe with two fingers to go back and forward" />
           <Check
@@ -1062,7 +1152,7 @@ function SettingsDialog() {
           <Check
             k="externalThumbnails"
             label="Make thumbnails for files on external drives"
-            note="When off, a private drive leaves no previews on this Mac."
+            note={os("When off, a private drive leaves no previews on this Mac.", "When off, a private drive leaves no previews on this computer.")}
           />
           <button className="btn subtle" onClick={() => void clearAppCache()}>
             Clear cache

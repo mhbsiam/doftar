@@ -149,7 +149,12 @@ export function CommandPalette() {
   // Close first. The command must run on the window, not on the palette.
   const run = (item: Item | undefined) => {
     if (!item) return;
-    close();
+    setOpen(false);
+    // No field may hold focus here: runCommand treats a focused text field as its target.
+    (document.activeElement as HTMLElement | null)?.blur();
+    // Focus lands on the window before the command runs, so a command that opens a
+    // dialog keeps the focus it takes itself.
+    back.current?.focus({ preventScroll: true });
     item.run();
   };
 

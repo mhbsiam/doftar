@@ -5,8 +5,8 @@ import { sameTags } from "../util/tags";
 import type { FileEntry, Tag } from "../types";
 
 /**
- * Tags fresher than the listing's. A listing reads tags only for items with a Finder label
- * (see `tags::read_labelled`). A scan adds the other tags. Views use `withTags`.
+ * Tags fresher than the listing's. On macOS a listing reads tags only for items with a Finder
+ * label (see `tags::read_labelled`); on Linux it reads every item's. A scan adds the rest. Views use `withTags`.
  */
 interface TagStore {
   byPath: Map<string, Tag[]>;

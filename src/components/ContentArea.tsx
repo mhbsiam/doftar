@@ -85,13 +85,15 @@ function ContentBody() {
           !isFolder(e) &&
           fileKind(e.ext) === "image" &&
           e.name.toLowerCase().startsWith("screenshot") &&
-          !e.path.startsWith(`${home}/Library/`)
+          // App data (~/Library, or XDG's ~/.config, ~/.cache and ~/.local) holds cached screenshots, not the user's.
+          !["Library", ".config", ".cache", ".local"].some((d) => e.path.startsWith(`${home}/${d}/`))
       ),
     [shotsFound.entries, home]
   );
   const results = shotsPage ? shotsFound : tagFound;
 
-  // Listings read tags only for items with a colour label. Read the rest here.
+  // On macOS listings read tags only for items with a colour label; on Linux each listing reads
+  // every item's tags. The scan reads the rest, and settles tags changed elsewhere in the store.
   const listingSettled = here !== null && loadedPath === here && !loading;
   useTagScan(entries, listingSettled, tagFilter !== null || groupBy === "tags", refreshTick);
 

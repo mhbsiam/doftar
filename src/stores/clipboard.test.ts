@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { copiedAgo, entryLabel, withEntry, type ClipEntry } from "./clipboard";
+import { describe, expect, it, vi } from "vitest";
+import { copiedAgo, entryLabel, useClipboard, withEntry, type ClipEntry } from "./clipboard";
+
+const board = vi.hoisted(() => ({ changeCount: 5, cleared: 0, written: [] as string[][] }));
+vi.mock("../ipc", () => ({
+  api: {
+    clipboardChangeCount: async () => board.changeCount,
+    clipboardClear: async () => void board.cleared++,
+    clipboardWriteFiles: async (paths: string[]) => (board.written.push(paths), ++board.changeCount),
+  },
+}));
 
 const entry = (paths: string[], at = 0): ClipEntry => ({ op: "copy", paths, at });
 
@@ -28,5 +37,41 @@ describe("labels", () => {
     expect(copiedAgo(0, 5 * 60_000)).toBe("5 min ago");
     expect(copiedAgo(0, 125 * 60_000)).toBe("2 h ago");
     expect(copiedAgo(0, 7 * 24 * 60 * 60_000)).toBe("7 d ago");
+  });
+});
+
+describe("forget", () => {
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  const start = (paths: string[], changeCount: number) => {
+    Object.assign(board, { changeCount, cleared: 0, written: [] });
+    useClipboard.setState({ op: "copy", paths, changeCount: 5, cutAt: null, history: [entry(paths), entry(["/c"])] });
+  };
+
+  it("leaves the system clipboard alone when it held none of the paths", async () => {
+    start(["/a"], 5);
+    useClipboard.getState().forget(["/z"]);
+    await settle();
+    expect(board).toMatchObject({ cleared: 0, written: [] });
+    expect(useClipboard.getState().paths).toEqual(["/a"]);
+  });
+
+  it("puts back the rest, or clears it when nothing is left", async () => {
+    start(["/a", "/b"], 5);
+    useClipboard.getState().forget(["/a"]);
+    await settle();
+    expect(board.written).toEqual([["/b"]]);
+    expect(useClipboard.getState().history.map((e) => e.paths)).toEqual([["/b"], ["/c"]]);
+    start(["/a"], 5);
+    useClipboard.getState().forget(["/a"]);
+    await settle();
+    expect(board.cleared).toBe(1);
+  });
+
+  it("keeps what another app copied since", async () => {
+    start(["/a"], 9);
+    useClipboard.getState().forget(["/a"]);
+    await settle();
+    expect(board).toMatchObject({ cleared: 0, written: [] });
+    expect(useClipboard.getState().op).toBe(null);
   });
 });

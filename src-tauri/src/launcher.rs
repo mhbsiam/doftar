@@ -5,27 +5,50 @@
 //! A small applet made with `osacompile` runs a script file that Doftar wrote. The terminal and shell then run outside the sandbox.
 //! The applet runs only scripts from the private Doftar folder. Other sandboxed apps cannot use it to escape.
 
+#[cfg(target_os = "macos")]
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(target_os = "macos")]
 use std::path::{Path, PathBuf};
 use std::process::Command;
+#[cfg(target_os = "macos")]
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+/// Linux has no sandbox to escape. A command runs directly, detached from Doftar.
+#[cfg(not(target_os = "macos"))]
+pub fn run(body: &str) -> Result<(), String> {
+    Command::new("/bin/sh")
+        .arg("-c")
+        .arg(body)
+        .stdin(std::process::Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("couldn't run: {e}"))
+}
+
+#[cfg(target_os = "macos")]
 const APP_NAME: &str = "Doftar Launcher.app";
+#[cfg(target_os = "macos")]
 const BUNDLE_ID: &str = "com.doftar.launcher";
 /// Increase when the applet script changes. This remakes old applets.
+#[cfg(target_os = "macos")]
 const SCRIPT_VERSION: &str = "2";
+#[cfg(target_os = "macos")]
 const STALE: Duration = Duration::from_secs(60);
 
+#[cfg(target_os = "macos")]
 fn strerr<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+#[cfg(target_os = "macos")]
 fn dir() -> Result<PathBuf, String> {
     private_dir(&crate::thumbs::cache_root().ok_or("no cache folder")?.join("launcher"))
 }
 
 /// Make `d` private. Refuse it if it or a parent folder is a symlink. Another process could then put scripts where the applet runs them.
+#[cfg(target_os = "macos")]
 fn private_dir(d: &Path) -> Result<PathBuf, String> {
     fs::create_dir_all(d).map_err(strerr)?;
     if fs::canonicalize(d).map_err(strerr)? != d {
@@ -43,6 +66,7 @@ pub fn applescript_quote(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
+#[cfg(target_os = "macos")]
 fn source(dir: &Path) -> String {
     let prefix = applescript_quote(&format!("{}/", dir.display()));
     format!(
@@ -60,6 +84,7 @@ fn source(dir: &Path) -> String {
     )
 }
 
+#[cfg(target_os = "macos")]
 fn applet(dir: &Path) -> Result<PathBuf, String> {
     let app = dir.join(APP_NAME);
     let src = dir.join("launcher.applescript");
@@ -115,6 +140,7 @@ fn applet(dir: &Path) -> Result<PathBuf, String> {
 }
 
 /// Returns when the applet is asked, not when the script ends.
+#[cfg(target_os = "macos")]
 pub fn run(body: &str) -> Result<(), String> {
     let dir = dir()?;
     let app = applet(&dir)?;
@@ -140,6 +166,7 @@ pub fn run(body: &str) -> Result<(), String> {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn sweep(dir: &Path) {
     let Ok(rd) = fs::read_dir(dir) else { return };
     for e in rd.flatten() {
@@ -161,7 +188,7 @@ fn sweep(dir: &Path) {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
 
@@ -189,7 +216,7 @@ mod tests {
 
     #[test]
     fn applet_only_runs_scripts_from_its_folder() {
-        let s = source(Path::new("/tmp/x"));
+        let s = source(&crate::paths::real("/tmp/x"));
         assert!(s.contains("if p starts with \"/tmp/x/\" then"));
         assert!(s.contains("do shell script \"/bin/sh \" & quoted form of p"));
     }

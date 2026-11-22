@@ -3,14 +3,19 @@
 use serde::Serialize;
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
 use crate::fsops::label;
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 use crate::fsops::path_str;
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 use crate::jobs::{OpResult, Step};
 
+#[cfg(target_os = "macos")]
 const IS_ALIAS: u16 = 0x8000;
 
+#[cfg(target_os = "macos")]
 pub fn finder_info_is_alias(info: &[u8; 32]) -> bool {
     u16::from_be_bytes([info[8], info[9]]) & IS_ALIAS != 0
 }
@@ -42,6 +47,7 @@ pub fn is_alias_file(_p: &Path) -> bool {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 fn alias_path(original: &Path) -> Option<std::path::PathBuf> {
     let dir = original.parent()?;
     let name = label(original);
@@ -72,18 +78,20 @@ fn make_one(original: &Path) -> Result<String, String> {
 }
 
 #[cfg(all(test, not(target_os = "macos")))]
+#[allow(dead_code)] // make_aliases, its only caller, is macOS-only
 fn make_one(_original: &Path) -> Result<String, String> {
     Err("aliases need macOS".into())
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 pub fn make_aliases(paths: Vec<String>) -> OpResult {
     let mut res = OpResult::default();
     for p in &paths {
-        let original = Path::new(p);
-        match make_one(original) {
+        let original = crate::paths::real(p);
+        match make_one(&(original)) {
             Ok(alias) => res.inverse.push(Step::trash(alias)),
-            Err(e) => res.errors.push(format!("\"{}\": {e}", label(original))),
+            Err(e) => res.errors.push(format!("\"{}\": {e}", label(&(original)))),
         }
     }
     res
@@ -107,14 +115,14 @@ pub fn resolve_alias(path: String) -> Result<AliasTarget, String> {
             &url,
             NSURLBookmarkResolutionOptions::WithoutUI,
         )
-        .map_err(|_| format!("The original of \"{}\" can't be found", label(Path::new(&path))))?;
+        .map_err(|_| format!("The original of \"{}\" can't be found", label(&crate::paths::real(&path))))?;
         let p = target.path().map(|s| s.to_string()).ok_or("the alias has no target")?;
-        let target = Path::new(&p);
+        let target = crate::paths::real(&p);
         let ext = target
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        let is_dir = target.is_dir() && !crate::fsops::is_package_dir(target, &ext);
+        let is_dir = target.is_dir() && !crate::fsops::is_package_dir(&target, &ext);
         Ok(AliasTarget { path: p, is_dir })
     }
     #[cfg(not(target_os = "macos"))]
@@ -158,7 +166,7 @@ mod tests {
             ]
         );
         for p in &made {
-            assert!(is_alias_file(Path::new(p)), "{p} should be flagged as an alias");
+            assert!(is_alias_file(&crate::paths::real(p)), "{p} should be flagged as an alias");
         }
         assert!(!is_alias_file(&base.join("note.txt")));
 

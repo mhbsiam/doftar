@@ -2,7 +2,12 @@
  * The commands of the command palette. They are the commands of the menu bar, with the same ids, so each runs as its menu item does.
  * Keep in step with src-tauri/src/menu.rs.
  */
-export const PALETTE_COMMANDS: { id: string; label: string; group: string; keys?: string; also?: string }[] = [
+import { FILE_MANAGER, keys } from "./platform";
+
+type PaletteCommand = { id: string; label: string; group: string; keys?: string; also?: string };
+
+/** Written with macOS keys; `PALETTE_COMMANDS` shows them in this system's form. */
+const COMMANDS: PaletteCommand[] = [
   { id: "new_window", label: "New window", group: "File", keys: "⌘N" },
   { id: "new_tab", label: "New tab", group: "File", keys: "⌘T" },
   { id: "new_folder", label: "New folder", group: "File", keys: "⌘⇧N" },
@@ -14,7 +19,7 @@ export const PALETTE_COMMANDS: { id: string; label: string; group: string; keys?
   { id: "get_info", label: "Properties", group: "File", keys: "⌘I", also: "info details size" },
   { id: "rename", label: "Rename", group: "File", keys: "F2" },
   { id: "duplicate", label: "Duplicate", group: "File", keys: "⌘D", also: "copy clone" },
-  { id: "reveal_in_finder", label: "Reveal in Finder", group: "File", keys: "⌥⌘R", also: "show finder" },
+  { id: "reveal_in_finder", label: `Reveal in ${FILE_MANAGER}`, group: "File", keys: "⌥⌘R", also: `show ${FILE_MANAGER.toLowerCase()}` },
   { id: "open_terminal", label: "Open in Terminal", group: "File", keys: "⌥⌘T", also: "shell console" },
   { id: "toggle_verify_copies", label: "Verify copies to other drives: turn on or off", group: "File", also: "checksum sha256 integrity external usb safe" },
   { id: "compress", label: "Compress to ZIP", group: "File", also: "archive" },
@@ -64,6 +69,8 @@ export const PALETTE_COMMANDS: { id: string; label: string; group: string; keys?
   { id: "shortcuts", label: "Keyboard shortcuts", group: "Help", keys: "⌘/", also: "keys" },
   { id: "copy_diagnostics", label: "Copy diagnostic info", group: "Help", also: "crash log error bug report" },
 ];
+
+export const PALETTE_COMMANDS: PaletteCommand[] = COMMANDS.map((c) => (c.keys ? { ...c, keys: keys(c.keys) } : c));
 
 /**
  * How well `query` matches `text`. Higher is better. -1 is no match.

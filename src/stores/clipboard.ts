@@ -65,7 +65,29 @@ export const useClipboard = create<ClipboardStore>((set, get) => ({
     }
   },
   clear: () => set({ op: null, paths: [], cutAt: null }),
-  forget: (paths) => set((s) => ({ history: s.history.filter((e) => !sameFiles(e.paths, paths)) })),
+  forget: (paths) => {
+    const gone = new Set(paths);
+    const keep = (ps: string[]) => ps.filter((p) => !gone.has(p));
+    const s = get();
+    const history = s.history.map((e) => ({ ...e, paths: keep(e.paths) })).filter((e) => e.paths.length > 0);
+    const rest = keep(s.paths);
+    if (rest.length === s.paths.length) return set({ history });
+    const op = rest.length > 0 ? s.op : null;
+    set({ history, paths: rest, op, cutAt: op === "cut" ? s.cutAt : null });
+    // Put back only the rest, and only while the system clipboard still holds these files:
+    // anything copied since, in any app, stays.
+    void api
+      .clipboardChangeCount()
+      .catch(() => -1)
+      .then((now) => {
+        if (now !== s.changeCount) return;
+        if (rest.length === 0) return void api.clipboardClear().catch(() => {});
+        void api
+          .clipboardWriteFiles(rest)
+          .then((cc) => useClipboard.setState({ changeCount: cc, cutAt: op === "cut" ? cc : null }))
+          .catch(() => {});
+      });
+  },
   clearHistory: () => set({ history: [] }),
 }));
 

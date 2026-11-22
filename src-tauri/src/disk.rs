@@ -678,11 +678,11 @@ fn scan(
         .into_sorted_vec()
         .into_iter()
         .map(|Reverse((size, path, modified_ms))| TopFile {
-            name: Path::new(&path)
+            name: crate::paths::real(&path)
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_default(),
-            category: category(&ext_of(Path::new(&path)), false),
+            category: category(&ext_of(&(crate::paths::real(&path))), false),
             path,
             size,
             modified_ms,
@@ -736,7 +736,7 @@ pub async fn disk_scan(
     let key = job_key(&webview, scan_id);
     crate::jobs::blocking(move || {
         let cancel = CANCELS.begin(key.clone());
-        let result = scan(Path::new(&root), &cancel, &mut |p| {
+        let result = scan(&(crate::paths::real(&root)), &cancel, &mut |p| {
             let _ = on_progress.send(p.clone());
         });
         CANCELS.end(&key, &cancel);
@@ -858,7 +858,7 @@ mod tests {
 
     #[test]
     fn knows_the_editing_apps_caches() {
-        let j = |p: &str| dev_folder_kind(Path::new(p)).map(|k| DEV_FOLDERS[k].0);
+        let j = |p: &str| dev_folder_kind(&(crate::paths::real(p))).map(|k| DEV_FOLDERS[k].0);
         assert_eq!(j("/u/Library/Application Support/Adobe/Common/Media Cache Files"), Some("Premiere media cache"));
         assert_eq!(j("/u/Movies/CacheClip"), Some("DaVinci Resolve cache"));
         assert_eq!(j("/u/Library/Caches/Adobe/After Effects"), Some("After Effects disk cache"));

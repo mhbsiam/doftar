@@ -20,7 +20,7 @@ import {
   navigateTo,
   activateEntry,
   openEntry,
-  quickLookPaths,
+  spacePreview,
   refreshSoon,
   setViewEntries,
   revealInFinder,
@@ -29,6 +29,7 @@ import { formatDate } from "../util/format";
 import { typeLabel } from "../util/kinds";
 import { compareTags, tagKey } from "../util/tags";
 import type { FileEntry, Tag } from "../types";
+import { FILE_MANAGER, ON_LINUX, os } from "../util/platform";
 
 /** Items shown per tag before "Show all". */
 const PREVIEW = 8;
@@ -88,7 +89,7 @@ export function TagsView() {
   useEffect(() => () => setViewEntries(paneTabs.getState().pane, []), [paneTabs]);
 
   const select = (e: React.MouseEvent | React.KeyboardEvent, entry: FileEntry) => {
-    if (e.metaKey) {
+    if (e.metaKey || (ON_LINUX && e.ctrlKey)) {
       const next = new Set(selected);
       if (next.has(entry.path)) next.delete(entry.path);
       else next.add(entry.path);
@@ -115,7 +116,7 @@ export function TagsView() {
         disabled: !single,
         onSelect: () => useTabs.getState().reveal(entry.path),
       },
-      { key: "finder", label: "Reveal in Finder", icon: <FolderOpenRegular />, onSelect: () => revealInFinder(targets.map((t) => t.path)) },
+      { key: "finder", label: `Reveal in ${FILE_MANAGER}`, icon: <FolderOpenRegular />, onSelect: () => revealInFinder(targets.map((t) => t.path)) },
       ...tagMenuItems(targets),
       {
         key: "copy-path",
@@ -158,7 +159,8 @@ export function TagsView() {
           } else if (e.key === " ") {
             e.preventDefault();
             select(e, entry);
-            if (!e.repeat) quickLookPaths([entry.path]);
+            // Select, then preview, as the folder listing does. The Linux viewers show files only.
+            if (!e.repeat && !(ON_LINUX && entry.isDir)) spacePreview([entry.path]);
           } else if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
             e.preventDefault();
             const r = e.currentTarget.getBoundingClientRect();
@@ -211,8 +213,8 @@ export function TagsView() {
             <>
               <h2>No tagged items</h2>
               <p className="hint">
-                Right-click a file or folder and pick a colour to tag it. Tagged items from
-                anywhere on your Mac show up here, grouped by tag.
+                Right-click a file or folder and pick a colour to tag it. Tagged items from{" "}
+                {os("anywhere on your Mac", "anywhere in your home folder")} show up here, grouped by tag.
               </p>
             </>
           )}
@@ -250,7 +252,10 @@ export function TagsView() {
           {found.truncated
             ? "Showing the first 5,000 tagged items. "
             : ""}
-          Tagged items come from Spotlight; places it doesn't index aren't listed.
+          {os(
+            "Tagged items come from Spotlight; places it doesn't index aren't listed.",
+            "Tagged items come from a scan of your home folder; places it doesn't reach aren't listed."
+          )}
         </p>
       )}
     </div>

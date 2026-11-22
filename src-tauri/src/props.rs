@@ -66,14 +66,14 @@ fn group_name(gid: u32) -> String {
 
 #[tauri::command(async)]
 pub fn item_info(path: String) -> Result<ItemInfo, String> {
-    let p = Path::new(&path);
-    let lmeta = fs::symlink_metadata(p).map_err(|e| e.to_string())?;
+    let p = crate::paths::real(&path);
+    let lmeta = fs::symlink_metadata(&p).map_err(|e| e.to_string())?;
     let symlink_target = lmeta
         .file_type()
         .is_symlink()
-        .then(|| fs::read_link(p).ok().map(|t| t.to_string_lossy().into_owned()))
+        .then(|| fs::read_link(&p).ok().map(|t| t.to_string_lossy().into_owned()))
         .flatten();
-    let meta = fs::metadata(p).unwrap_or_else(|_| lmeta.clone());
+    let meta = fs::metadata(&p).unwrap_or_else(|_| lmeta.clone());
     let created = meta
         .created()
         .ok()
@@ -90,10 +90,10 @@ pub fn item_info(path: String) -> Result<ItemInfo, String> {
         modified_ms: ms(meta.mtime(), meta.mtime_nsec()),
         accessed_ms: ms(meta.atime(), meta.atime_nsec()),
         symlink_target,
-        tags: crate::tags::read(p),
+        tags: crate::tags::read(&(p)),
         default_app: crate::openwith::default_app(&path),
-        quarantined: crate::quarantine::is_quarantined(p),
-        where_froms: crate::quarantine::where_froms(p),
+        quarantined: crate::quarantine::is_quarantined(&(p)),
+        where_froms: crate::quarantine::where_froms(&(p)),
     })
 }
 
@@ -171,7 +171,7 @@ pub async fn file_checksums(path: String, job_id: u64, webview: tauri::Webview) 
     let key = job_key(&webview, job_id);
     crate::jobs::blocking(move || {
         let cancel = CANCELS.begin(key.clone());
-        let out = checksums_of(Path::new(&path), &cancel);
+        let out = checksums_of(&(crate::paths::real(&path)), &cancel);
         CANCELS.end(&key, &cancel);
         out
     })
@@ -192,7 +192,7 @@ fn measure(paths: &[String], cancel: &AtomicBool, mut emit: impl FnMut(&SizeProg
             continue;
         };
         let root_dev = meta.dev();
-        let mut stack = vec![(Path::new(root).to_path_buf(), meta)];
+        let mut stack = vec![(crate::paths::real(root).to_path_buf(), meta)];
         while let Some((dir, meta)) = stack.pop() {
             if cancel.load(Ordering::Relaxed) {
                 total.cancelled = true;
@@ -200,7 +200,7 @@ fn measure(paths: &[String], cancel: &AtomicBool, mut emit: impl FnMut(&SizeProg
             }
             if meta.is_dir() {
                 let Ok(rd) = fs::read_dir(&dir) else {
-                    if paths.iter().any(|r| Path::new(r) == dir) {
+                    if paths.iter().any(|r| crate::paths::real(r) == dir) {
                         total.denied = true;
                     } else {
                         total.unreadable += 1;

@@ -85,25 +85,44 @@ mod mac {
     }
 }
 
+/// In-process file clipboard. It is not shared with other apps, but copy, cut,
+/// paste and Paste from History all work inside Doftar.
 #[cfg(not(target_os = "macos"))]
 mod mac {
     use super::PasteboardFiles;
+    use std::sync::Mutex;
+
+    static FILES: Mutex<(i64, Vec<String>)> = Mutex::new((0, Vec::new()));
+
+    fn board() -> std::sync::MutexGuard<'static, (i64, Vec<String>)> {
+        FILES.lock().unwrap()
+    }
+
     pub fn change_count() -> i64 {
-        0
+        board().0
     }
-    pub fn write(_: &[String]) -> i64 {
-        0
+    pub fn write(paths: &[String]) -> i64 {
+        let mut b = board();
+        b.0 += 1;
+        b.1 = paths.to_vec();
+        b.0
     }
+    #[allow(dead_code)] // the crate-level write_text that calls it is macOS-only
     pub fn write_text(_: &str) -> bool {
         false
     }
     pub fn read() -> PasteboardFiles {
+        let b = board();
         PasteboardFiles {
-            paths: Vec::new(),
-            change_count: 0,
+            paths: b.1.clone(),
+            change_count: b.0,
         }
     }
-    pub fn clear() {}
+    pub fn clear() {
+        let mut b = board();
+        b.0 += 1;
+        b.1.clear();
+    }
     pub fn data() -> Option<super::Pasted> {
         None
     }
@@ -113,6 +132,7 @@ mod mac {
 #[cfg(target_os = "macos")]
 pub use mac::paths as pasteboard_paths;
 
+#[cfg(target_os = "macos")]
 pub fn write_text(text: &str) -> bool {
     mac::write_text(text)
 }
@@ -167,7 +187,7 @@ fn save_pasted(dest: &std::path::Path, what: &Pasted, stamp: &str) -> Result<cra
 pub async fn clipboard_paste_data(dest: String, stamp: String) -> Result<Option<crate::jobs::Step>, String> {
     // AppKit reads the pasteboard on any thread.
     crate::jobs::blocking(move || match mac::data() {
-        Some(what) => save_pasted(std::path::Path::new(&dest), &what, &stamp).map(Some),
+        Some(what) => save_pasted(&(crate::paths::real(&dest)), &what, &stamp).map(Some),
         None => Ok(None),
     })
     .await?
@@ -189,7 +209,7 @@ mod tests {
         };
         assert_ne!(a, b);
         for p in [&a, &b] {
-            assert_eq!(std::path::Path::new(p).parent().unwrap(), dir, "the stamp must not leave the folder");
+            assert_eq!(crate::paths::real(p).parent().unwrap(), dir, "the stamp must not leave the folder");
             assert_eq!(std::fs::read_to_string(p).unwrap(), "hello");
         }
         assert!(a.ends_with("Pasted Text 2026-11-09 at 14.03..x.txt"), "{a}");
