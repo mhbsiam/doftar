@@ -545,7 +545,7 @@ export function NavPane() {
             colorId={trashColor}
           />
         }
-        selected={activePath === trashPath}
+        selected={trashPath !== null && activePath === trashPath}
         onClick={() => trashPath !== null && navigateTo({ kind: "path", path: trashPath })}
         title={
           trashPath === null

@@ -154,7 +154,9 @@ pub async fn delete_permanently(
 pub(super) fn keeps_history(path: &Path) -> Result<(), String> {
     let in_trash = path.components().any(|c| {
         let s = c.as_os_str().to_str();
-        matches!(s, Some(".Trash" | ".Trashes")) || s.is_some_and(|s| s.starts_with(".Trash-"))
+        matches!(s, Some(".Trash" | ".Trashes"))
+            // A drive's freedesktop Trash is .Trash-<uid>. On macOS that name is an ordinary folder.
+            || (cfg!(not(target_os = "macos")) && s.is_some_and(|s| s.starts_with(".Trash-")))
     });
     #[cfg(not(target_os = "macos"))]
     let in_trash = in_trash || crate::trash::user_trash().ok().is_some_and(|t| path.starts_with(t));
@@ -195,3 +197,19 @@ pub(super) fn delete_permanently_sync(paths: &[String], ids: Option<&[Option<Str
     res
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::keeps_history;
+    use std::path::Path;
+
+    #[test]
+    fn git_may_go_only_from_a_trash() {
+        assert!(keeps_history(Path::new("/Users/a/repo/.git")).is_err());
+        assert!(keeps_history(Path::new("/Users/a/.Trash/repo/.git")).is_ok());
+        assert!(keeps_history(Path::new("/Volumes/X/.Trashes/501/repo/.git")).is_ok());
+        // .Trash-<uid> is a Trash only on Linux.
+        let drive_trash = keeps_history(Path::new("/Volumes/X/.Trash-1000/files/repo/.git"));
+        assert_eq!(drive_trash.is_ok(), cfg!(not(target_os = "macos")));
+    }
+}

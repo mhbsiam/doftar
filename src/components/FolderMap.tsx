@@ -8,6 +8,7 @@ import { squarify } from "../util/squarify";
 import { formatSize } from "../util/format";
 import { dur } from "../util/motion";
 import { textScale } from "../util/textScale";
+import { ON_LINUX } from "../util/platform";
 import type { DiskMapNode, Rect } from "../types";
 
 /**
@@ -286,7 +287,7 @@ function neighbour(blocks: Block[], from: Block, key: string): Block | null {
 
 /**
  * Zoom-outs of the mounted folder maps. Each acts only when its map has focus.
- * The "Enclosing Folder" menu item (Ctrl+↑) calls them through `folderMapUp`, because the menu takes the key first.
+ * The "Enclosing Folder" menu item (⌘↑, Ctrl+↑ on Linux) calls them through `folderMapUp`, because the menu takes the key first.
  */
 const zoomOuts = new Set<() => boolean>();
 export const folderMapUp = () => [...zoomOuts].some((up) => up());
@@ -501,7 +502,7 @@ export function FolderMap(props: {
   const atRoot = useRef(true);
   atRoot.current = path === root;
   useEffect(() => {
-    // At the top there is nothing to zoom out of, so Ctrl+↑ goes to the enclosing folder.
+    // At the top there is nothing to zoom out of, so ⌘↑ (Ctrl+↑ on Linux) goes to the enclosing folder.
     const up = () => {
       if (atRoot.current || !canvasRef.current || document.activeElement !== canvasRef.current) return false;
       void zoomRef.current(null);
@@ -514,8 +515,8 @@ export function FolderMap(props: {
   const onKey = (e: React.KeyboardEvent) => {
     const list = blocksRef.current;
     const cur = list.find((b) => b.key === focus) ?? null;
-    // Check Ctrl+↑ before the arrows, which would take it as plain ↑.
-    if (e.key === "Backspace" || e.key === "Escape" || (e.key === "ArrowUp" && (e.metaKey || e.ctrlKey))) {
+    // Check ⌘↑ (Ctrl+↑ on Linux) before the arrows, which would take it as plain ↑.
+    if (e.key === "Backspace" || e.key === "Escape" || (e.key === "ArrowUp" && (ON_LINUX ? e.ctrlKey : e.metaKey))) {
       e.preventDefault();
       void zoom(null);
     } else if (e.key.startsWith("Arrow")) {

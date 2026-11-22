@@ -212,6 +212,8 @@ fn launches_from_link(p: &Path) -> bool {
         || RUNS_BY_KIND.contains(&ext.as_str())
         || (meta.is_dir() && crate::fsops::is_package_dir(p, &ext))
         || crate::alias::is_alias_file(p)
+        // macOS finds no default app for a name that isn't UTF-8, so it can't tell if the target runs.
+        || (cfg!(target_os = "macos") && p.to_str().is_none())
         || runs_when_opened(p)
 }
 
