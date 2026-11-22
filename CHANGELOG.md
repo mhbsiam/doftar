@@ -1,10 +1,26 @@
 # Changelog
 
-## Linux — unreleased
+## 1.0.3 — 2026-11-18
 
-The Linux port, based on the Mac app's 1.0.3. It now lives on `main` beside the Mac app:
-one source builds both, and the Mac app keeps its macOS features (Quick Look, Share,
-Uninstall, Finder's app chooser, native PDF pages, ⌘ shortcuts). Fixes made while porting:
+- A preview version of Doftar for Linux is available. It runs on Ubuntu 24.04 and later (x86_64), as a .deb and an AppImage. [LINUX.md](LINUX.md) tells what works.
+- Split view opens and closes with a fold animation.
+- If the screen does not have sufficient space, the left pane becomes narrower.
+- A Select by Pattern button (*) is adjacent to the command palette.
+- Esc closes split view and keeps the pane that you use. If a cut is pending, Esc cancels the cut first.
+- Help is larger. A search box finds topics in all sections, and each section starts with links to its topics.
+- Help tells about the features added since 1.0.1.
+- Column names in data tables align with their columns.
+- Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).
+- Check for updates (in the Options menu) opens the latest release.
+- In the preview pane, the other sheets and tables of Excel and SQLite files open.
+- After you move files to the Trash or delete them, they are not on the clipboard or in Paste from History.
+- The preview pane does not stop on a FIFO or a device file.
+- Doftar removes old thumbnails of files on external drives.
+- A .npy file with an impossible shape in its header shows an error.
+
+### Linux preview
+
+The Linux app has the features of the Mac app, except Quick Look, Share, Uninstall and native PDF pages. Fixes made in the port:
 
 - The image viewer's **Open in default app** works: the viewer window was
   missing the `open_path` permission.
@@ -24,19 +40,7 @@ Uninstall, Finder's app chooser, native PDF pages, ⌘ shortcuts). Fixes made wh
 - Eject, `xdg-mime`, `xdg-open` and D-Bus calls run under timeouts, and
   every opened terminal is reaped instead of left as a zombie.
 - The Trash row's context menu no longer races the folder load at startup.
-- Help describes the Linux app, and REFERENCE.md's shortcut table matches
-  the shortcuts Linux ships.
-
-## 1.0.3 — 2026-11-18
-
-- Split view opens and closes with a fold animation.
-- If the screen does not have sufficient space, the left pane becomes narrower.
-- A Select by Pattern button (*) is adjacent to the command palette.
-- Esc closes split view and keeps the pane that you use. If a cut is pending, Esc cancels the cut first.
-- Help is larger. A search box finds topics in all sections, and each section starts with links to its topics.
-- Help tells about the features added since 1.0.1.
-- Column names in data tables align with their columns.
-- Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).
+- Help describes the Linux app and shows Linux shortcuts (Ctrl, Alt).
 
 ## 1.0.2 — 2026-11-13
 

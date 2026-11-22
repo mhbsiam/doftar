@@ -26,8 +26,9 @@
   <p class="log-lede">What has shipped in Doftar.</p>
 
   <article id="v1.0.3">
-    <header><span class="tag">Mac</span><h2><a href="https://github.com/mhbsiam/doftar/releases/tag/v1.0.3">v1.0.3</a></h2><time class="when" datetime="2026-11-18">2026-11-18</time></header>
+    <header><span class="tag">Mac · Linux preview</span><h2><a href="https://github.com/mhbsiam/doftar/releases/tag/v1.0.3">v1.0.3</a></h2><time class="when" datetime="2026-11-18">2026-11-18</time></header>
     <ul>
+      <li>A preview version of Doftar for Linux is available. It runs on Ubuntu 24.04 and later (x86_64), as a .deb and an AppImage. <a href="https://github.com/mhbsiam/doftar/blob/main/LINUX.md">What works on Linux</a></li>
       <li>Split view opens and closes with a fold animation.</li>
       <li>If the screen does not have sufficient space, the left pane becomes narrower.</li>
       <li>A Select by Pattern button (*) is adjacent to the command palette.</li>
@@ -36,6 +37,26 @@
       <li>Help tells about the features added since 1.0.1.</li>
       <li>Column names in data tables align with their columns.</li>
       <li>Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).</li>
+      <li>Check for updates (in the Options menu) opens the latest release.</li>
+      <li>In the preview pane, the other sheets and tables of Excel and SQLite files open.</li>
+      <li>After you move files to the Trash or delete them, they are not on the clipboard or in Paste from History.</li>
+      <li>The preview pane does not stop on a FIFO or a device file.</li>
+      <li>Doftar removes old thumbnails of files on external drives.</li>
+      <li>A .npy file with an impossible shape in its header shows an error.</li>
+    </ul>
+    <h3>Linux preview</h3>
+    <p class="log-note">The Linux app has the features of the Mac app, except Quick Look, Share, Uninstall and native PDF pages. Fixes made in the port:</p>
+    <ul>
+      <li>The image viewer's <b>Open in default app</b> works: the viewer window was missing the <code>open_path</code> permission.</li>
+      <li>PDFs that use non-embedded standard fonts or CJK text render correctly: the content security policy now allows the app's own cmaps and fonts.</li>
+      <li>Saving from the built-in editors keeps the file's tags (<code>user.*</code> xattrs) and its times; the inode swap no longer drops them.</li>
+      <li>Copying refuses special files (FIFOs, devices) with a per-file error instead of hanging the job; Cancel stays responsive.</li>
+      <li>A crafted GIF header can no longer abort the app — image decoding is bounded, including the GIF branch the limits missed.</li>
+      <li>Empty Trash removes the <code>.trashinfo</code> sidecars too, including ones orphaned earlier, and the locked-file recovery no longer shells out to the macOS-only <code>chflags</code>.</li>
+      <li>"Open in Terminal" and tag search handle folders whose names are not UTF-8; archives compress and extract them byte-exactly.</li>
+      <li>Eject, <code>xdg-mime</code>, <code>xdg-open</code> and D-Bus calls run under timeouts, and every opened terminal is reaped instead of left as a zombie.</li>
+      <li>The Trash row's context menu no longer races the folder load at startup.</li>
+      <li>Help describes the Linux app and shows Linux shortcuts (Ctrl, Alt).</li>
     </ul>
   </article>
 
