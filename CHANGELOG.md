@@ -11,6 +11,7 @@
 - Help tells about the features added since 1.0.1.
 - Column names in data tables align with their columns.
 - Doftar uses a zlib version with a security fix (RUSTSEC-2026-0544).
+- Doftar uses cookie, url and parquet versions with security fixes (RUSTSEC-2026-0594, RUSTSEC-2026-0592, RUSTSEC-2026-0595).
 - Check for updates (in the Options menu) opens the latest release.
 - In the preview pane, the other sheets and tables of Excel and SQLite files open.
 - After you move files to the Trash or delete them, they are not on the clipboard or in Paste from History.

@@ -21,7 +21,7 @@ afterEach(() => {
   ui.closeFolderTree();
 });
 
-test("the item menu shows shortcuts and sets Delete apart", async () => {
+test("the item menu sets Delete apart and has no shortcuts", async () => {
   ({ unmount } = await mount(<ContextMenuHost />, WIDE));
   useUI.getState().openContextMenu(
     40,
