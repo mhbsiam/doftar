@@ -225,16 +225,18 @@ function Surface(props: {
     close();
   };
 
-  const renderItems = (items: MenuItemSpec[]) =>
+  // Hovering a main-menu item closes an open submenu after a delay. Hovering an item inside the
+  // submenu keeps it open.
+  const renderItems = (items: MenuItemSpec[], inSub = false) =>
     items.flatMap((item) => {
       const divider = item.dividerBefore ? (
         <div key={`div-${item.key}`} className="ctx-divider" role="separator" />
       ) : null;
-      const body = renderItem(item);
+      const body = renderItem(item, inSub ? cancelSubClose : scheduleSubClose);
       return [divider, body].filter((n): n is React.ReactElement => n !== null);
     });
 
-  const renderItem = (item: MenuItemSpec): React.ReactElement | null => {
+  const renderItem = (item: MenuItemSpec, onHover: () => void): React.ReactElement | null => {
       if (item.swatches) {
         return (
           <div key={item.key} className="ctx-swatches" role="group" aria-label={item.label}>
@@ -248,7 +250,7 @@ function Surface(props: {
                 tabIndex={-1}
                 className={`ctx-swatch ${sw.state}`}
                 style={{ "--swatch": sw.color } as React.CSSProperties}
-                onMouseEnter={scheduleSubClose}
+                onMouseEnter={onHover}
                 onClick={() => {
                   sw.onSelect();
                   close();
@@ -288,7 +290,7 @@ function Surface(props: {
           tabIndex={-1}
           aria-disabled={item.disabled || undefined}
           className={`ctx-item${item.disabled ? " disabled" : ""}`}
-          onMouseEnter={scheduleSubClose}
+          onMouseEnter={onHover}
           onClick={() => runItem(item)}
         >
           <span className="ctx-icon">{item.icon}</span>
@@ -437,7 +439,7 @@ function Surface(props: {
           onMouseLeave={scheduleSubClose}
         >
           <div ref={subRef} role="menu" tabIndex={-1} onKeyDown={onSubKeyDown}>
-            {renderItems(sub.items)}
+            {renderItems(sub.items, true)}
           </div>
         </FloatingMenu>
       )}
