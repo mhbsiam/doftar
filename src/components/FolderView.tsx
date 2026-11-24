@@ -31,7 +31,6 @@ import { DetailsView } from "./DetailsView";
 import { GridView } from "./GridView";
 import { ColumnView } from "./ColumnView";
 import { terminalMenuItems } from "./terminalMenu";
-import { keysOf } from "../util/palette";
 import { tagMenuItems } from "./tagMenu";
 import { tagFilterActive } from "../util/tags";
 import { useSettings } from "../stores/settings";
@@ -338,14 +337,12 @@ export function FolderView({
             key: "nf",
             label: "Folder",
             icon: <FolderRegular />,
-            keys: keysOf("new_folder"),
             onSelect: () => newFolder(),
           },
           {
             key: "nt",
             label: "Text Document",
             icon: <DocumentRegular />,
-            keys: keysOf("new_file"),
             onSelect: () => newFile(),
           },
         ],
@@ -354,7 +351,6 @@ export function FolderView({
         key: "paste",
         label: "Paste",
         icon: <ClipboardPasteRegular />,
-        keys: keys("⌘V"),
         onSelect: () => paste(),
       },
       { key: "d1", dividerBefore: true },
@@ -362,7 +358,6 @@ export function FolderView({
         key: "refresh",
         label: "Refresh",
         icon: <ArrowClockwiseRegular />,
-        keys: keysOf("refresh"),
         onSelect: () => refreshByUser(),
       },
       { key: "d2", dividerBefore: true },
@@ -607,7 +602,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         key: "open",
         label: "Open",
         icon: <FolderOpenRegular />,
-        keys: keysOf("open"),
         onSelect: () => openEntry(entry),
       },
       ...(isFolder(entry)
@@ -685,7 +679,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
               key: "tree",
               label: "Show folder tree",
               icon: <TextBulletListTreeRegular />,
-              keys: keysOf("folder_tree"),
               onSelect: () => showFolderTree(entry.path),
             },
           ]
@@ -694,7 +687,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         key: "finder",
         label: `Reveal in ${FILE_MANAGER}`,
         icon: <WindowNewRegular />,
-        keys: keysOf("reveal_in_finder"),
         onSelect: () => revealInFinder(targets),
       },
       { key: "d1", dividerBefore: true },
@@ -705,7 +697,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
               key: "duplicate",
               label: "Duplicate",
               icon: <DocumentCopyRegular />,
-              keys: keysOf("duplicate"),
               onSelect: () => void duplicateSelection(targets),
             },
           ]),
@@ -720,7 +711,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
                     key: "folder-with",
                     label: "New Folder with Selection",
                     icon: <FolderRegular />,
-                    keys: keysOf("new_folder_selection"),
                     onSelect: () => void newFolderWithSelection(),
                   },
                 ]
@@ -754,7 +744,7 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         icon: <CopyRegular />,
         dividerBefore: true,
         items: [
-          { key: "copy-path", label: "Path", icon: <CopyRegular />, keys: keys("⌥⌘C"), onSelect: () => copyAsPath(targets) },
+          { key: "copy-path", label: "Path", icon: <CopyRegular />, onSelect: () => copyAsPath(targets) },
           { key: "copy-name", label: multi ? "Names" : "Name", icon: <TextTRegular />, onSelect: () => copyName(targets) },
         ],
       },
@@ -771,7 +761,6 @@ async function openRowMenu(x: number, y: number, entry: FileEntry) {
         key: "props",
         label: "Properties",
         icon: <InfoRegular />,
-        keys: keysOf("get_info"),
         onSelect: () => ui.openProperties(multi ? shown : entry),
       },
       ...(!ON_LINUX && isInstalledApp(entry)

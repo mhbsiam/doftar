@@ -293,7 +293,6 @@ function Surface(props: {
         >
           <span className="ctx-icon">{item.icon}</span>
           <span className="ctx-label">{item.label}</span>
-          {item.keys && <span className="ctx-shortcut">{item.keys}</span>}
           {item.checked && <CheckmarkRegular className="ctx-check" />}
         </div>
       );

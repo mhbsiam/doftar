@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PALETTE_COMMANDS, keysOf, matchScore, visitBonus } from "./palette";
+import { PALETTE_COMMANDS, matchScore, visitBonus } from "./palette";
 
 describe("matchScore", () => {
   it("needs every character, in order", () => {
@@ -33,12 +33,5 @@ describe("visitBonus", () => {
     const old = now - 31 * 24 * 3600 * 1000;
     expect(visitBonus(8, old, now)).toBe(visitBonus(8, now, now) / 2);
     expect(visitBonus(undefined, now, now)).toBe(visitBonus(1, now, now));
-  });
-});
-
-describe("keysOf", () => {
-  it("gives a menu the shortcut of the same command", () => {
-    expect(keysOf("duplicate")).toBe("⌘D");
-    expect(keysOf("compress")).toBeUndefined();
   });
 });

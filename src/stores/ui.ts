@@ -18,8 +18,6 @@ export interface MenuItemSpec {
   icon?: React.ReactElement;
   disabled?: boolean;
   checked?: boolean;
-  /** The keyboard shortcut, shown muted after the label. */
-  keys?: string;
   dividerBefore?: boolean;
   items?: MenuItemSpec[];
   onSelect?: () => void;

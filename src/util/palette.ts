@@ -94,11 +94,6 @@ export function matchScore(query: string, text: string): number {
   return score;
 }
 
-const KEYS = new Map(PALETTE_COMMANDS.flatMap((c) => (c.keys ? [[c.id, c.keys] as const] : [])));
-
-/** The shortcut of a command, for menus that show the same command. */
-export const keysOf = (id: string): string | undefined => KEYS.get(id);
-
 const MONTH_MS = 30 * 24 * 3600 * 1000;
 
 /** Extra score for a folder opened often. Halved once it has not been opened for a month. */

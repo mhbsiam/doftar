@@ -2627,9 +2627,7 @@ html[data-vt="back"] .content.cols {
 }
 /* Tertiary text is below 4.5:1 on selection fills, so use secondary there. */
 .drow.selected .name-where,
-.filerow.selected .fdesc,
-.ctx-item:hover .ctx-shortcut,
-.ctx-item:focus .ctx-shortcut {
+.filerow.selected .fdesc {
   color: var(--text-2);
 }
 .search-note {
@@ -3766,11 +3764,6 @@ html[data-vt="back"] .content.cols {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.ctx-shortcut {
-  color: var(--text-3);
-  font-size: 0.929rem;
-  margin-left: 1.714rem;
 }
 .ctx-check {
   color: var(--accent);

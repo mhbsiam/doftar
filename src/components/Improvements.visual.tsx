@@ -27,9 +27,9 @@ test("the item menu shows shortcuts and sets Delete apart", async () => {
     40,
     40,
     [
-      { key: "open", label: "Open", icon: <FolderOpenRegular />, keys: "⌘↓" },
-      { key: "copy-as", label: "Copy as", icon: <CopyRegular />, dividerBefore: true, items: [{ key: "p", label: "Path", keys: "⌥⌘C" }] },
-      { key: "props", label: "Properties", icon: <InfoRegular />, keys: "⌘I" },
+      { key: "open", label: "Open", icon: <FolderOpenRegular /> },
+      { key: "copy-as", label: "Copy as", icon: <CopyRegular />, dividerBefore: true, items: [{ key: "p", label: "Path" }] },
+      { key: "props", label: "Properties", icon: <InfoRegular /> },
     ],
     [
       { key: "cut", label: "Cut", icon: <CutRegular /> },
