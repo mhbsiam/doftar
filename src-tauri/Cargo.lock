@@ -1142,6 +1142,7 @@ dependencies = [
  "objc2-quick-look-ui",
  "objc2-web-kit",
  "parquet",
+ "percent-encoding",
  "plist",
  "pulldown-cmark",
  "quick-xml",

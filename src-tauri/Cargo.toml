@@ -44,6 +44,7 @@ calamine = "0.38"
 quick-xml = "0.42"
 zip = { version = "9", default-features = false, features = ["deflate"] }
 indexmap = { version = "2", features = ["serde"] }
+percent-encoding = "2"
 
 # The split-view window glide (zoom.rs steps the frame along the GTK main loop) and the
 # Wayland check that keeps split view from growing a window it cannot place.

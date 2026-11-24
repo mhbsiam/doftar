@@ -17,6 +17,7 @@
 - The preview pane does not stop on a FIFO or a device file.
 - Doftar removes old thumbnails of files on external drives.
 - A .npy file with an impossible shape in its header shows an error.
+- Long videos play with sound in the player and the preview pane. Before, WebKit lost the audio track of some long videos.
 
 ### Linux preview
 

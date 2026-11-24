@@ -226,7 +226,7 @@ async function follow(href: string, docPath: string, stage: HTMLElement) {
 /** The reader draws text and data. Anything else is a picture: Quick Look on macOS, a thumbnail on Linux. */
 async function load(entry: FileEntry): Promise<Shown> {
   const { path, ext } = entry;
-  if (isPlayableVideo(ext)) return { kind: "video", src: convertFileSrc(path) };
+  if (isPlayableVideo(ext)) return { kind: "video", src: convertFileSrc(path, "media") };
   // A PDF with a password, or still in the cloud, shows its picture below.
   if (fileKind(ext) === "pdf") {
     if (ON_LINUX) {
@@ -618,7 +618,7 @@ function Preview({ entry }: { entry: FileEntry }) {
         )}
       </div>
       {audio && shown.kind !== "loading" && (
-        <audio key={entry.modifiedMs} className="pv-audio" src={convertFileSrc(entry.path)} controls />
+        <audio key={entry.modifiedMs} className="pv-audio" src={convertFileSrc(entry.path, "media")} controls />
       )}
       <InfoDrawer key={entry.modifiedMs} entry={entry} />
     </>

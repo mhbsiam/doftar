@@ -220,6 +220,7 @@ fn main() {
     }
     crashlog::install();
     let app = tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(video::SCHEME, video::serve)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_drag::init())
         .plugin(

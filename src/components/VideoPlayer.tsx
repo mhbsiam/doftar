@@ -142,7 +142,7 @@ export function VideoPlayer() {
             <audio
               ref={video}
               className="ap-audio"
-              src={path ? convertFileSrc(path) : undefined}
+              src={path ? convertFileSrc(path, "media") : undefined}
               controls
               autoPlay
               onError={() => path && setFailed(true)}
@@ -171,7 +171,7 @@ export function VideoPlayer() {
             <video
               ref={video as RefObject<HTMLVideoElement>}
               className="vp-video"
-              src={path ? convertFileSrc(path) : undefined}
+              src={path ? convertFileSrc(path, "media") : undefined}
               controls
               autoPlay
               playsInline

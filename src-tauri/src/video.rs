@@ -120,6 +120,105 @@ pub async fn open_video(
     Ok(())
 }
 
+/// URL scheme for the player and the preview pane. Pages ask for it with `convertFileSrc(path, "media")`.
+pub const SCHEME: &str = "media";
+/// Bytes sent for a range with no end, as Tauri's asset protocol does.
+const CHUNK: u64 = 1000 * 1024;
+/// Most bytes held in memory for one bounded range.
+const MAX_SPAN: u64 = 64 * 1024 * 1024;
+
+/// The asset protocol cuts every range at 1000 KB. AVFoundation asks for a track's sample table in one range and drops the track if the reply is short.
+/// A long video then plays with no sound. This scheme sends a bounded range whole. It allows the same paths as the asset scope, for player files only.
+/// Remove this when Tauri's asset protocol sends a whole bounded range.
+pub fn serve<R: tauri::Runtime>(
+    ctx: tauri::UriSchemeContext<'_, R>,
+    request: tauri::http::Request<Vec<u8>>,
+    responder: tauri::UriSchemeResponder,
+) {
+    let scope = ctx.app_handle().asset_protocol_scope();
+    tauri::async_runtime::spawn_blocking(move || {
+        let response = media_response(&request, |p| scope.is_allowed(p)).unwrap_or_else(|e| {
+            eprintln!("Doftar: media protocol: {e}");
+            status(500)
+        });
+        responder.respond(response);
+    });
+}
+
+type Response = tauri::http::Response<Vec<u8>>;
+
+fn status(code: u16) -> Response {
+    tauri::http::Response::builder().status(code).body(Vec::new()).unwrap()
+}
+
+fn media_response(request: &tauri::http::Request<Vec<u8>>, allowed: impl Fn(&Path) -> bool) -> std::io::Result<Response> {
+    use std::io::{Read, Seek, SeekFrom};
+    use tauri::http::header::*;
+
+    let raw = request.uri().path();
+    let path = percent_encoding::percent_decode_str(raw.strip_prefix('/').unwrap_or(raw)).decode_utf8_lossy();
+    let Ok(safe) = tauri::path::SafePathBuf::new(path.as_ref().into()) else {
+        return Ok(status(403));
+    };
+    if !is_video(safe.as_ref()) || !allowed(safe.as_ref()) {
+        return Ok(status(403));
+    }
+    let mut file = match fs::File::open(&safe) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(status(404)),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return Ok(status(403)),
+        Err(e) => return Err(e),
+    };
+    let len = file.metadata()?.len();
+    let mut magic = Vec::new();
+    (&mut file).take(8192).read_to_end(&mut magic)?;
+    let mime = tauri::utils::mime_type::MimeType::parse(&magic, &path);
+    let resp = tauri::http::Response::builder()
+        .header(CONTENT_TYPE, mime)
+        .header(ACCEPT_RANGES, "bytes");
+    if request.method() == tauri::http::Method::HEAD {
+        return Ok(resp.header(CONTENT_LENGTH, len).body(Vec::new()).unwrap());
+    }
+    // A request with no range gets the first chunk as a range, so a large file is never read whole.
+    let header = request.headers().get(RANGE).and_then(|r| r.to_str().ok()).unwrap_or("bytes=0-");
+    let unsatisfiable = |resp: tauri::http::response::Builder| {
+        resp.status(416).header(CONTENT_RANGE, format!("bytes */{len}")).body(Vec::new()).unwrap()
+    };
+    let Some((start, end)) = span(header, len) else {
+        return Ok(unsatisfiable(resp));
+    };
+    let mut buf = Vec::with_capacity((end + 1 - start) as usize);
+    file.seek(SeekFrom::Start(start))?;
+    file.take(end + 1 - start).read_to_end(&mut buf)?;
+    // The file got shorter after its size was read.
+    if buf.is_empty() {
+        return Ok(unsatisfiable(resp));
+    }
+    Ok(resp
+        .status(206)
+        .header(CONTENT_RANGE, format!("bytes {start}-{}/{len}", start + buf.len() as u64 - 1))
+        .header(CONTENT_LENGTH, buf.len())
+        .body(buf)
+        .unwrap())
+}
+
+/// The inclusive byte span to send for a single `Range` header, or None if it can't be met.
+/// A bounded range comes back whole up to `MAX_SPAN`. A range with no end gets `CHUNK` bytes.
+fn span(header: &str, len: u64) -> Option<(u64, u64)> {
+    let (from, to) = header.strip_prefix("bytes=")?.split_once('-')?;
+    let (from, to) = (from.trim(), to.trim());
+    let (start, end) = match (from, to) {
+        ("", n) => (len.saturating_sub(n.parse().ok()?), len.checked_sub(1)?),
+        (s, "") => {
+            let s: u64 = s.parse().ok()?;
+            (s, s.saturating_add(CHUNK - 1))
+        }
+        (s, e) => (s.parse().ok()?, e.parse().ok()?),
+    };
+    let end = end.min(len.checked_sub(1)?).min(start.saturating_add(MAX_SPAN - 1));
+    (start <= end).then_some((start, end))
+}
+
 /// Returns a video that was asked for before the page listened. Async, so it does not wait on the main thread while `build` holds the lock there.
 #[tauri::command(async)]
 pub fn video_ready() -> Option<serde_json::Value> {
@@ -155,5 +254,44 @@ mod tests {
         assert!(!is_video(&(crate::paths::real("/a/song.ogg"))));
         assert!(!is_video(&(crate::paths::real("/a/clip.mkv"))));
         assert!(!is_video(&(crate::paths::real("/a/clip"))));
+    }
+
+    #[test]
+    fn sends_a_bounded_range_whole() {
+        // The audio sample table of a 96-minute video. The asset protocol cut it at 1000 KB and the sound went away.
+        assert_eq!(span("bytes=1477618-2555461", 960_111_774), Some((1_477_618, 2_555_461)));
+        assert_eq!(span("bytes=0-1", 10), Some((0, 1)));
+        assert_eq!(span("bytes=5-", 10), Some((5, 9)));
+        assert_eq!(span("bytes=0-", 10_000_000), Some((0, CHUNK - 1)));
+        assert_eq!(span("bytes=-4", 10), Some((6, 9)));
+        assert_eq!(span("bytes=0-999999999", 1 << 40), Some((0, MAX_SPAN - 1)));
+        assert_eq!(span("bytes=10-", 10), None);
+        assert_eq!(span("bytes=8-3", 10), None);
+        assert_eq!(span("bytes=0-1, 4-5", 10), None);
+        assert_eq!(span("bytes=0-", 0), None);
+    }
+
+    #[test]
+    fn media_reads_only_allowed_player_files() {
+        let dir = std::env::temp_dir().join(format!("doftar-media-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("clip.mp4");
+        let note = dir.join("note.txt");
+        fs::write(&clip, b"0123456789").unwrap();
+        fs::write(&note, b"secret").unwrap();
+        let get = |path: &Path, range: &str, allow: bool| {
+            let uri = format!("media://localhost/{}", percent_encoding::utf8_percent_encode(&path.to_string_lossy(), percent_encoding::NON_ALPHANUMERIC));
+            let request = tauri::http::Request::builder().uri(uri).header("range", range).body(Vec::new()).unwrap();
+            media_response(&request, |_| allow).unwrap()
+        };
+
+        assert_eq!(get(&note, "bytes=0-5", true).status(), 403);
+        assert_eq!(get(&clip, "bytes=0-5", false).status(), 403);
+        let ok = get(&clip, "bytes=2-5", true);
+        assert_eq!(ok.status(), 206);
+        assert_eq!(ok.headers()["content-range"], "bytes 2-5/10");
+        assert_eq!(ok.body(), b"2345");
+        assert_eq!(get(&clip, "bytes=10-", true).status(), 416);
+        fs::remove_dir_all(&dir).unwrap();
     }
 }
